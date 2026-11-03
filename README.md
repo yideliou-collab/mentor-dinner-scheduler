@@ -40,7 +40,7 @@ GitHub Pages 只能提供靜態檔案，無法自行儲存所有學生的選擇�
 
 ## 發佈到 GitHub Pages
 
-此資料夾已作為獨立 repository `yideliou-collab/mentor-dinner-scheduler` 的根目錄，`main` 推送後由 `.github/workflows/deploy.yml` 自動發佈到 GitHub Pages。工作流程只發佈五個公開檔案：`index.html`、`styles.css`、`calendar.css`、`app.js`、`config.js`。Supabase SQL 與 Edge Function 原始碼保留在 repository 供維護，不會複製到網站產物。此流程依照 [GitHub Pages 官方文件](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site)；Edge Function 設定依照 [Supabase 官方文件](https://supabase.com/docs/guides/functions/deploy)。
+此資料夾已作為獨立 repository `yideliou-collab/mentor-dinner-scheduler` 的根目錄，`main` 推送後由 `.github/workflows/deploy.yml` 自動發佈到 GitHub Pages。工作流程只發佈五個公開檔案：`index.html`、`styles.css`、`calendar.css`、`app.js`、`config.js`，並將 `index.html` 中的 `__BUILD_VERSION__` 換成該次 Git commit，讓 CSS 與 JavaScript 用同一版本網址載入，避免手機快取混用新舊檔案。Supabase SQL 與 Edge Function 原始碼保留在 repository 供維護，不會複製到網站產物。此流程依照 [GitHub Pages 官方文件](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site)；Edge Function 設定依照 [Supabase 官方文件](https://supabase.com/docs/guides/functions/deploy)。
 
 ## 隱私與帳號限制
 
@@ -79,3 +79,5 @@ GitHub Pages 只能提供靜態檔案，無法自行儲存所有學生的選擇�
 本次逐格延長修正再次通過 `node --test tests/calendar-logic.test.mjs`。正式 API 已驗證第一次四格的**每一格**人數各增加一人、相鄰空白格可新增一格、隔開的單格遭拒，以及一格刪除；測試時段已清除。瀏覽器自動化無法啟動，因此手機實際觸控仍需人工確認。
 
 本次手機操作修正移除刪除模式按鈕，改為點綠格刪一格；加入日期／時間捷徑與雙指手動捲動。前端邏輯測試包含點擊刪除、日期／時間跳轉與雙指橫縱位移；瀏覽器自動化仍無法啟動，需以實機確認雙指拖曳。
+
+手機曾出現新頁面文字搭配舊樣式、日曆停在「載入日期中」的版本混用現象。GitHub Pages 對 HTML、JS、CSS 各自快取約 10 分鐘；部署流程現已為所有公開資產加同一 commit 版號。新增 `tests/startup.test.mjs` 檢查前端初始化能建立七天與 336 個時間格，並在 JS 未執行時顯示載入提示。若手機已快取舊首頁，可在網址後加任意查詢參數重新開啟首頁。
