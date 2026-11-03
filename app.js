@@ -15,7 +15,7 @@ const lastStartIndex = times.length - mealCells;
 const state = {
   today: '', end: `${Number(config.eventYear)}-12-14`, weekStart: '',
   counts: new Map(), cellCounts: new Map(), selections: new Set(), token: localStorage.getItem(sessionKey) || '',
-  ready: false, saving: false, drag: null, eraseMode: false,
+  ready: false, saving: false, drag: null, touchPan: null, activeDay: '', initialScrollDone: false,
 };
 const $ = (id) => document.getElementById(id);
 const cellKey = (day, time) => `${day}|${time}`;
@@ -64,6 +64,18 @@ function renderWeek() {
   const grid = $('week-grid');
   grid.replaceChildren();
   const days = Array.from({ length: 7 }, (_, index) => addDays(state.weekStart, index));
+  if (!days.includes(state.activeDay)) state.activeDay = days.find(dayEnabled) || '';
+  const dayJump = $('day-jump');
+  dayJump.replaceChildren();
+  days.forEach((day, index) => {
+    const button = createElement('button', '', `${weekdays[index].slice(-1)} ${dateLabel(day)}`);
+    button.type = 'button';
+    button.dataset.day = day;
+    button.dataset.index = String(index);
+    button.disabled = !dayEnabled(day);
+    if (day === state.activeDay) button.setAttribute('aria-current', 'date');
+    dayJump.append(button);
+  });
   const nowMinutes = taiwanCurrentMinutes();
   $('week-label').textContent = state.today > state.end ? '本年度調查已結束' : `${dateLabel(days[0])} — ${dateLabel(days[6])} · ${config.eventYear}`;
   $('calendar-range-label').textContent = state.today > state.end ? '已截止' : `${dateLabel(state.today)} — 12/14`;
@@ -108,6 +120,29 @@ function renderWeek() {
   }
   scroll.scrollLeft = oldLeft;
   scroll.scrollTop = oldTop;
+  if (!state.initialScrollDone) {
+    state.initialScrollDone = true;
+    jumpToDay(state.activeDay);
+    jumpToHour(Math.max(0, Math.floor((nowMinutes - 60) / 60)));
+  }
+}
+function jumpToDay(day) {
+  const index = Array.from($('day-jump').children).findIndex((button) => button.dataset.day === day);
+  if (index < 0) return;
+  state.activeDay = day;
+  for (const button of $('day-jump').children) {
+    if (button.dataset.day === day) button.setAttribute('aria-current', 'date');
+    else button.removeAttribute('aria-current');
+  }
+  const grid = $('week-grid');
+  const header = grid.querySelectorAll('.day-header')[index];
+  if (header) $('calendar-scroll').scrollLeft = Math.max(0, header.offsetLeft - grid.firstElementChild.offsetWidth);
+}
+function jumpToHour(hour) {
+  const index = Math.min(times.length - 1, Math.max(0, Math.floor(hour * 60 / stepMinutes)));
+  const grid = $('week-grid');
+  const label = grid.querySelectorAll('.time-label')[index];
+  if (label) $('calendar-scroll').scrollTop = Math.max(0, label.offsetTop - grid.firstElementChild.offsetHeight);
 }
 function renderAccount() {
   $('account-button').textContent = state.token ? '登出' : '輸入代號';
@@ -116,8 +151,6 @@ function renderAccount() {
   $('footer-account-button').disabled = Boolean(state.token) || !state.ready || state.today > state.end;
   const hours = state.selections.size * stepMinutes / 60;
   $('selection-count').textContent = state.token ? `已標記 ${hours} 小時可參加時間` : '尚未登入';
-  $('add-mode').setAttribute('aria-pressed', String(!state.eraseMode));
-  $('erase-mode').setAttribute('aria-pressed', String(state.eraseMode));
 }
 function statisticsRows() {
   if (state.today > state.end) return [];
@@ -163,7 +196,7 @@ function dragRange(drag) {
   const from = Math.min(drag.start, drag.end);
   return { from, to: Math.min(times.length - 1, Math.max(drag.start + drag.minCells - 1, drag.end)) };
 }
-function selectionForPointer(button, eraseMode) { return button !== 2 && !eraseMode; }
+function selectionForPointer(button, chosen) { return button !== 2 && !chosen; }
 function dragMinimum(day, index, selected) { return selected && !adjacentToSelection(day, index) ? mealCells : 1; }
 function paintDragPreview() {
   clearDragPreview();
@@ -183,16 +216,16 @@ function hitCell(event) {
 }
 function startDrag(event) {
   const cell = event.target.closest('.time-cell');
-  if (!cell || cell.disabled || state.saving || (event.button !== 0 && event.button !== 2)) return;
+  if (event.pointerType === 'touch' && !event.isPrimary) { cancelDrag(); return; }
+  if (!cell || cell.disabled || state.saving || state.touchPan || (event.button !== 0 && event.button !== 2)) return;
   if (!state.token) { $('account-dialog').showModal(); return; }
   event.preventDefault();
   const day = cell.dataset.day;
   const index = Number(cell.dataset.index);
-  const selected = selectionForPointer(event.button, state.eraseMode);
   const chosen = state.selections.has(cellKey(day, times[index]));
-  if (selected && chosen) { setStatus('這格已選取；點相鄰的空白格可延長。要移除請按右鍵，手機請選「刪除時間」。'); return; }
+  const selected = selectionForPointer(event.button, chosen);
   if (!selected && !chosen) return;
-  state.drag = { day, start: index, end: index, selected, minCells: dragMinimum(day, index, selected) };
+  state.drag = { day, start: index, end: index, selected, minCells: dragMinimum(day, index, selected), pointerId: event.pointerId };
   $('week-grid').setPointerCapture(event.pointerId);
   paintDragPreview();
 }
@@ -225,7 +258,38 @@ function endDrag(event) {
   clearDragPreview();
   commitDrag(drag);
 }
-function cancelDrag() { state.drag = null; clearDragPreview(); }
+function cancelDrag() {
+  const pointerId = state.drag?.pointerId;
+  if (pointerId !== undefined && $('week-grid').hasPointerCapture(pointerId)) $('week-grid').releasePointerCapture(pointerId);
+  state.drag = null;
+  clearDragPreview();
+}
+function touchCenter(touches, count) {
+  let x = 0;
+  let y = 0;
+  for (let index = 0; index < count; index++) { x += touches[index].clientX; y += touches[index].clientY; }
+  return { x: x / count, y: y / count };
+}
+function startTouchPan(event) {
+  const fingers = event.touches.length >= 2 ? 2 : event.target.closest('.time-cell') ? 0 : 1;
+  if (!fingers) return;
+  if (fingers === 2) cancelDrag();
+  const scroll = $('calendar-scroll');
+  state.touchPan = { fingers, ...touchCenter(event.touches, fingers), left: scroll.scrollLeft, top: scroll.scrollTop };
+  event.preventDefault();
+}
+function moveTouchPan(event) {
+  const pan = state.touchPan;
+  if (!pan || event.touches.length < pan.fingers) return;
+  const point = touchCenter(event.touches, pan.fingers);
+  const scroll = $('calendar-scroll');
+  scroll.scrollLeft = pan.left + pan.x - point.x;
+  scroll.scrollTop = pan.top + pan.y - point.y;
+  event.preventDefault();
+}
+function endTouchPan(event) {
+  if (state.touchPan && event.touches.length < state.touchPan.fingers) state.touchPan = null;
+}
 async function api(action, body = {}, token = state.token) {
   const response = await fetch(endpoint, {
     method: 'POST',
@@ -289,6 +353,10 @@ $('week-grid').addEventListener('pointerdown', startDrag);
 $('week-grid').addEventListener('pointermove', moveDrag);
 $('week-grid').addEventListener('pointerup', endDrag);
 $('week-grid').addEventListener('pointercancel', cancelDrag);
+$('calendar-scroll').addEventListener('touchstart', startTouchPan, { passive: false });
+$('calendar-scroll').addEventListener('touchmove', moveTouchPan, { passive: false });
+$('calendar-scroll').addEventListener('touchend', endTouchPan);
+$('calendar-scroll').addEventListener('touchcancel', (event) => { endTouchPan(event); cancelDrag(); });
 $('week-grid').addEventListener('contextmenu', (event) => {
   if (event.target.closest('.time-cell')) event.preventDefault();
 });
@@ -300,29 +368,33 @@ $('week-grid').addEventListener('keydown', (event) => {
   if (!state.token) { $('account-dialog').showModal(); return; }
   const index = Number(cell.dataset.index);
   const day = cell.dataset.day;
-  const selected = (event.key === 'Enter' || event.key === ' ') && !state.eraseMode;
   const chosen = state.selections.has(cellKey(day, times[index]));
-  if (selected && chosen) { setStatus('這格已選取；點相鄰的空白格可延長。'); return; }
+  const selected = (event.key === 'Enter' || event.key === ' ') && !chosen;
   if (!selected && !chosen) return;
   commitDrag({ day, start: index, end: index, selected, minCells: dragMinimum(day, index, selected) });
 });
-$('add-mode').addEventListener('click', () => { state.eraseMode = false; renderAccount(); });
-$('erase-mode').addEventListener('click', () => { state.eraseMode = true; renderAccount(); });
+$('day-jump').addEventListener('click', (event) => {
+  const button = event.target.closest('button[data-day]');
+  if (button && !button.disabled) jumpToDay(button.dataset.day);
+});
+document.querySelectorAll('.time-jump button').forEach((button) => button.addEventListener('click', () => {
+  jumpToHour(button.dataset.hour === 'now' ? Math.max(0, taiwanCurrentMinutes() / 60 - 1) : Number(button.dataset.hour));
+}));
 $('download-csv').addEventListener('click', downloadStatistics);
 $('account-button').addEventListener('click', () => state.token ? logout() : $('account-dialog').showModal());
 $('footer-account-button').addEventListener('click', () => $('account-dialog').showModal());
 $('close-dialog').addEventListener('click', () => $('account-dialog').close());
 $('account-dialog').addEventListener('click', (event) => { if (event.target === $('account-dialog')) $('account-dialog').close(); });
 $('account-form').addEventListener('submit', login);
-$('prev-week').addEventListener('click', () => { state.weekStart = addDays(state.weekStart, -7); renderWeek(); });
-$('next-week').addEventListener('click', () => { state.weekStart = addDays(state.weekStart, 7); renderWeek(); });
+$('prev-week').addEventListener('click', () => { state.weekStart = addDays(state.weekStart, -7); renderWeek(); jumpToDay(state.activeDay); });
+$('next-week').addEventListener('click', () => { state.weekStart = addDays(state.weekStart, 7); renderWeek(); jumpToDay(state.activeDay); });
 initializeToday();
 if (!configured) setStatus('網站尚未連接共用資料庫。請網站管理者完成部署設定。', true);
 else if (state.today <= state.end) loadSnapshot();
 else setStatus('本年度調查已結束。');
 setInterval(() => {
   const changed = initializeToday();
-  if (configured && state.today <= state.end && !document.hidden && !state.drag && !state.saving) {
+  if (configured && state.today <= state.end && !document.hidden && !state.drag && !state.touchPan && !state.saving) {
     if (changed || state.ready) loadSnapshot();
   }
 }, 60000);

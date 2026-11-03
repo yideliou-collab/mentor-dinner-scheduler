@@ -22,9 +22,9 @@ const context = {
 runInNewContext(`${logic}
   state.today = '2026-11-03';
   state.end = '2026-12-14';
-  globalThis.testApi = { dragRange, dragMinimum, selectionForPointer, isPastStart, statisticsRows, state };`, context);
+  globalThis.testApi = { dragRange, dragMinimum, selectionForPointer, touchCenter, startTouchPan, moveTouchPan, endTouchPan, jumpToDay, jumpToHour, isPastStart, statisticsRows, state };`, context);
 
-const { dragRange, dragMinimum, selectionForPointer, isPastStart, statisticsRows, state } = context.testApi;
+const { dragRange, dragMinimum, selectionForPointer, touchCenter, startTouchPan, moveTouchPan, endTouchPan, jumpToDay, jumpToHour, isPastStart, statisticsRows, state } = context.testApi;
 const day = '2026-11-04';
 assert.equal(dragMinimum(day, 20, true), 4);
 assert.deepEqual({ ...dragRange({ start: 20, end: 20, minCells: 4 }) }, { from: 20, to: 23 });
@@ -36,8 +36,30 @@ assert.equal(dragMinimum(day, 30, true), 4);
 assert.deepEqual({ ...dragRange({ start: 44, end: 47, minCells: 4 }) }, { from: 44, to: 47 });
 assert.deepEqual({ ...dragRange({ start: 44, end: 43, minCells: 4 }) }, { from: 43, to: 47 });
 assert.equal(selectionForPointer(0, false), true);
-assert.equal(selectionForPointer(2, false), false);
 assert.equal(selectionForPointer(0, true), false);
+assert.equal(selectionForPointer(2, true), false);
+assert.deepEqual({ ...touchCenter([{ clientX: 20, clientY: 30 }, { clientX: 60, clientY: 90 }], 2) }, { x: 40, y: 60 });
+const scroll = { scrollLeft: 100, scrollTop: 200 };
+const dayButtons = ['2026-11-02', '2026-11-03', '2026-11-04'].map((value) => ({ dataset: { day: value }, setAttribute() {}, removeAttribute() {} }));
+const grid = {
+  firstElementChild: { offsetWidth: 57, offsetHeight: 58 },
+  querySelectorAll: (selector) => selector === '.day-header'
+    ? [{ offsetLeft: 57 }, { offsetLeft: 176 }, { offsetLeft: 295 }]
+    : selector === '.time-label' ? Array.from({ length: 48 }, (_, index) => ({ offsetTop: 58 + index * 42 })) : [],
+};
+context.document = { getElementById: (id) => ({ 'calendar-scroll': scroll, 'day-jump': { children: dayButtons }, 'week-grid': grid })[id] };
+jumpToDay('2026-11-04');
+assert.equal(scroll.scrollLeft, 238);
+jumpToHour(12);
+assert.equal(scroll.scrollTop, 24 * 42);
+let prevented = false;
+startTouchPan({ touches: [{ clientX: 20, clientY: 30 }, { clientX: 60, clientY: 90 }], target: { closest: () => ({}) }, preventDefault: () => { prevented = true; } });
+moveTouchPan({ touches: [{ clientX: 10, clientY: 20 }, { clientX: 50, clientY: 80 }], preventDefault: () => { prevented = true; } });
+assert.equal(prevented, true);
+assert.equal(scroll.scrollLeft, 248);
+assert.equal(scroll.scrollTop, 24 * 42 + 10);
+endTouchPan({ touches: [] });
+assert.equal(state.touchPan, null);
 assert.equal(isPastStart('2026-11-02', 20, 0), true);
 assert.equal(isPastStart('2026-11-03', 23, 11 * 60 + 31), true);
 assert.equal(isPastStart('2026-11-03', 24, 11 * 60 + 31), false);

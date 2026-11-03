@@ -3,11 +3,15 @@
 .calendar-panel{padding-bottom:0}
 .calendar-help{display:flex;justify-content:space-between;gap:16px;color:#6c8177;font-size:12px;margin:16px 0 12px}
 .calendar-help strong{color:#173b35}
-.calendar-mode{display:flex;gap:8px;margin:0 0 13px}
-.mode-button{min-height:42px;padding:8px 18px;border:1px solid #c8d8cb;border-radius:10px;background:#fff;color:#315046;font-size:12px;font-weight:800}
-.mode-button[aria-pressed="true"]{background:#173b35;border-color:#173b35;color:#fff}
-#erase-mode[aria-pressed="true"]{background:#a44e3e;border-color:#a44e3e}
-.calendar-scroll{height:min(68vh,690px);min-height:360px;overflow:auto;border:1px solid #dce6dc;border-radius:15px;background:#fff;scrollbar-color:#a7b9a9 #f2f5f0}
+.calendar-navigation{margin:0 0 13px;display:grid;gap:8px}
+.day-jump,.time-jump{display:grid;gap:5px}
+.day-jump{grid-template-columns:repeat(7,minmax(0,1fr))}
+.time-jump{grid-template-columns:repeat(5,minmax(0,1fr))}
+.day-jump button,.time-jump button{min-width:0;min-height:44px;padding:5px 2px;border:1px solid #c8d8cb;border-radius:9px;background:#fff;color:#315046;font-size:11px;font-weight:800}
+.day-jump button[aria-current="date"],.time-jump button:focus-visible{background:#173b35;border-color:#173b35;color:#fff}
+.day-jump button:disabled{opacity:.45;cursor:default}
+.time-jump button:hover,.day-jump button:hover:not(:disabled):not([aria-current="date"]){background:#e8f1e9}
+.calendar-scroll{height:min(68vh,690px);min-height:360px;overflow:auto;border:1px solid #dce6dc;border-radius:15px;background:#fff;scrollbar-color:#a7b9a9 #f2f5f0;touch-action:none;overscroll-behavior:contain}
 .week-grid{display:grid;grid-template-columns:68px repeat(7,minmax(135px,1fr));min-width:1013px;align-content:start}
 .grid-corner,.day-header{position:sticky;top:0;z-index:3;min-height:58px;background:#f4f7f1;border-right:1px solid #dce6dc;border-bottom:1px solid #dce6dc}
 .grid-corner{left:0;z-index:5;display:grid;place-items:center;font-size:11px;color:#83978a;font-weight:700}
@@ -18,7 +22,7 @@
 .day-header.unavailable span{color:#8d9690}
 .day-header.past strong{text-decoration:line-through;text-decoration-color:#a9b1aa}
 .time-label{position:sticky;left:0;z-index:2;background:#fff;border-right:1px solid #dce6dc;border-bottom:1px solid #e9eee8;height:38px;padding:8px 8px 0 0;text-align:right;color:#8a9a8d;font-size:11px;font-variant-numeric:tabular-nums}
-.time-cell{height:38px;border:0;border-right:1px solid #e5ece3;border-bottom:1px solid #e9eee8;background:#fff;color:#9d5b38;text-align:left;padding:0 8px;user-select:none;touch-action:pan-x;position:relative;transition:background .12s}
+.time-cell{height:38px;border:0;border-right:1px solid #e5ece3;border-bottom:1px solid #e9eee8;background:#fff;color:#9d5b38;text-align:left;padding:0 8px;user-select:none;touch-action:none;position:relative;transition:background .12s}
 .time-cell.hour-start{border-top:1px solid #d4e0d4}
 .time-cell:hover:not(:disabled){background:#eef5ed}
 .time-cell:disabled{background:#f7f8f5;color:#bfc9bf;cursor:default}
@@ -42,4 +46,4 @@
 .statistics-count{flex:none;font-size:13px;color:#ad714d}
 .statistics-empty{grid-column:1/-1;color:#71857a;font-size:13px;padding:10px 0}
 @media(max-width:760px){.statistics-heading{align-items:flex-start;flex-direction:column}.statistics-list{grid-template-columns:1fr}.statistics-panel{padding:23px 19px}.statistics-heading .button{width:100%}}
-@media(max-width:620px){.calendar-help{flex-direction:column;gap:5px}.calendar-mode{display:grid;grid-template-columns:1fr 1fr}.mode-button{padding:8px 5px}.calendar-scroll{height:64vh}.week-grid{grid-template-columns:57px repeat(7,minmax(119px,1fr));min-width:890px}.day-header{padding:8px}.time-cell{height:42px}.time-label{height:42px}.calendar-section .section-heading p{font-size:12px;line-height:1.8}}
+@media(max-width:620px){.calendar-help{flex-direction:column;gap:5px}.calendar-scroll{height:64vh}.day-jump button,.time-jump button{font-size:10px}.week-grid{grid-template-columns:57px repeat(7,minmax(119px,1fr));min-width:890px}.day-header{padding:8px}.time-cell{height:42px}.time-label{height:42px}.calendar-section .section-heading p{font-size:12px;line-height:1.8}}
