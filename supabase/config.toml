@@ -1,0 +1,2 @@
+[functions.availability]
+verify_jwt = false

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#173b35" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="description" content="劉懿德老師與導生的聚餐時間調查。看看大家方便的時段，選出你能參加的時間。" />
+    <title>一起吃頓飯｜導生聚餐時間調查</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./calendar.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="site-header">
+        <a class="brand" href="#top" aria-label="回到頁首"><span>導生聚餐<span class="brand-sub">時間調查</span></span></a>
+        <div class="header-actions"><span class="header-deadline" id="header-deadline">即日起至 12 / 14</span><button class="button button-outline" id="account-button" type="button">輸入代號</button></div>
+      </header>
+      <main id="top">
+        <section class="hero" aria-labelledby="hero-title">
+          <div class="hero-copy"><div class="eyebrow"><span class="eyebrow-line"></span> 期中考結束了，找個時間聚聚</div><h1 id="hero-title">一起找個時間，<br /><em>吃頓飯。</em></h1><p class="hero-lead">各位同學好，我是電子物理系的劉懿德老師，也是各位未來四年的導師。之前大家的時間剛好錯開了，這次換個方式：先看看哪些時段比較多人方便，再選出你也能來的時間。</p><a class="button button-primary hero-cta" href="#calendar">看看大家的時間 <span aria-hidden="true">↗</span></a></div>
+          <div class="hero-art" aria-hidden="true"><div class="art-orbit orbit-one"></div><div class="art-orbit orbit-two"></div><div class="art-circle circle-one"></div><div class="art-circle circle-two"></div><div class="art-center"><span>一起</span><strong>好好吃飯</strong><small>LET'S CATCH UP</small></div><div class="art-caption">A LITTLE TIME TOGETHER</div></div>
+        </section>
+        <section class="info-strip" aria-label="聚餐資訊"><div class="info-item"><span class="info-icon" aria-hidden="true">⌖</span><div><span class="info-label">聚餐地點</span><strong>校內 LALA Kitchen</strong></div></div><div class="info-item"><span class="info-icon" aria-hidden="true">◷</span><div><span class="info-label">聚餐時間</span><strong>約兩小時</strong></div></div><div class="info-item"><span class="info-icon" aria-hidden="true">✳</span><div><span class="info-label">可選日期</span><strong id="date-range-label">今日 — 12 月 14 日</strong></div></div></section>
+        <section class="calendar-section" id="calendar" aria-labelledby="calendar-title"><div class="section-heading"><div><span class="section-kicker">FIND OUR TIME</span><h2 id="calendar-title">在週曆上畫出你有空的時間</h2><p>按住並拖曳，以 30 分鐘為單位選取可參加的時間；再次拖曳已選區域即可取消。每格數字是可從該時間開始、連續參加兩小時的人數，不顯示身分。</p></div><div class="legend"><span class="legend-dot"></span> 綠色＝你已選取</div></div>
+          <div class="calendar-panel"><div class="calendar-toolbar"><div><span class="calendar-overline">每格 30 分鐘 · 台灣時間</span><h3 id="week-label">載入日期中…</h3></div><div class="calendar-arrows"><button id="prev-week" class="icon-button" type="button" aria-label="上一週">←</button><button id="next-week" class="icon-button" type="button" aria-label="下一週">→</button></div></div><div class="calendar-help"><span>左右捲動可查看整週</span><span>可選日期：<strong id="calendar-range-label">今日至 12 月 14 日</strong></span></div><div class="calendar-scroll" id="calendar-scroll"><div class="week-grid" id="week-grid" role="region" aria-label="可拖曳的每週時間表"></div></div><div class="calendar-footer"><div><strong id="selection-count">尚未登入</strong><span>拖曳結束即儲存；再次登入可修改。</span></div><button class="button button-primary" id="footer-account-button" type="button">輸入代號，開始選擇 <span aria-hidden="true">↗</span></button></div></div><p class="calendar-status" id="status" role="status" aria-live="polite"></p>
+        </section>
+        <section class="closing-card" aria-labelledby="closing-title"><div class="closing-symbol" aria-hidden="true">✳</div><div><span class="section-kicker">SEE YOU SOON</span><h2 id="closing-title">有空就來聊聊吧。</h2><p>不論是課業、研究或生活上有任何問題，都歡迎隨時與我聯繫。若這次不克出席，也請直接告訴我，可以約在我辦公室吃。</p></div><div class="contact-card"><span>劉懿德老師</span><strong>科學三館 SC451</strong><a href="tel:+88635712121">03-571-2121 分機 56128 ↗</a></div></section>
+      </main><footer class="site-footer"><span>電子物理系 · 導生聚餐時間調查</span><span>時間以台灣時間（UTC+8）為準</span></footer>
+    </div>
+    <dialog id="account-dialog" class="account-dialog" aria-labelledby="dialog-title"><form id="account-form" class="dialog-inner" method="dialog" novalidate><button id="close-dialog" class="dialog-close" type="button" aria-label="關閉">×</button><span class="section-kicker">WELCOME BACK</span><h2 id="dialog-title">用自訂代號記住你的時間</h2><p>第一次填寫時設定代號與 4 位數 PIN；之後用相同組合登入，即可查看或修改已選時段。</p><label for="account-name">自訂代號或簡稱</label><input id="account-name" name="accountName" type="text" autocomplete="username" maxlength="40" placeholder="自由填寫，最多 40 個字" required /><label for="pin">4 位數 PIN</label><input id="pin" name="pin" type="password" inputmode="numeric" autocomplete="current-password" minlength="4" maxlength="4" pattern="[0-9]{4}" placeholder="輸入 4 位數字" required /><p class="form-hint">請記住代號與 PIN。建議不要使用真名、學號或生日；代號不會公開顯示。</p><p id="login-error" class="form-error" role="alert"></p><button class="button button-primary dialog-submit" id="login-button" type="submit">登入或首次建立</button></form></dialog>
+    <script src="./config.js"></script><script type="module" src="./app.js"></script>
+  </body>
+</html>
