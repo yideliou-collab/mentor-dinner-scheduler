@@ -32,6 +32,11 @@ function todayInTaiwan(): string {
   const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
   return `${value.year}-${value.month}-${value.day}`;
 }
+function currentMinutesInTaiwan(): number {
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date());
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return Number(value.hour) * 60 + Number(value.minute);
+}
 async function participantFromRequest(request: Request, required = false): Promise<string | null> {
   const token = request.headers.get('x-session-token');
   if (!token) { if (required) throw new HttpError(401, '請先登入。'); return null; }
@@ -103,6 +108,9 @@ async function paint(request: Request, body: Record<string, unknown>) {
   const validDay = !Number.isNaN(parsedDay.getTime()) && parsedDay.toISOString().slice(0, 10) === day;
   if (!validDay || day < today || day > end || from < 0 || to < from || typeof body.selected !== 'boolean') {
     throw new HttpError(400, '日期或時間不在可選範圍內。');
+  }
+  if (body.selected && (from > allowedSlots.length - 4 || (to - from + 1) % 4 !== 0 || (day === today && 10 * 60 + from * 30 < currentMinutesInTaiwan()))) {
+    throw new HttpError(400, '請選擇尚未開始的完整兩小時時段。');
   }
   const slots = allowedSlots.slice(from, to + 1);
   if (body.selected) {

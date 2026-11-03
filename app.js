@@ -11,6 +11,7 @@ const times = Array.from({ length: (endMinutes - startMinutes) / stepMinutes }, 
   const minutes = startMinutes + index * stepMinutes;
   return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
 });
+const lastStartIndex = times.length - mealCells;
 const state = {
   today: '', end: `${Number(config.eventYear)}-12-14`, weekStart: '',
   counts: new Map(), selections: new Set(), token: localStorage.getItem(sessionKey) || '',
@@ -28,13 +29,23 @@ function taiwanToday() {
   const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
   return `${value.year}-${value.month}-${value.day}`;
 }
+function taiwanCurrentMinutes() {
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date());
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return Number(value.hour) * 60 + Number(value.minute);
+}
+function timeAt(minutes) { return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`; }
+function isPastStart(day, index, nowMinutes = taiwanCurrentMinutes()) {
+  return day < state.today || (day === state.today && startMinutes + index * stepMinutes < nowMinutes);
+}
 function setStatus(message, error = false) {
   $('status').textContent = message;
   $('status').classList.toggle('error', error);
 }
 function dayEnabled(day) { return day >= state.today && day <= state.end; }
 function bestCount(day) {
-  return Math.max(0, ...times.map((time) => state.counts.get(cellKey(day, time)) || 0));
+  const nowMinutes = taiwanCurrentMinutes();
+  return Math.max(0, ...times.slice(0, lastStartIndex + 1).map((time, index) => isPastStart(day, index, nowMinutes) ? 0 : state.counts.get(cellKey(day, time)) || 0));
 }
 function createElement(tag, className, text) {
   const element = document.createElement(tag);
@@ -49,6 +60,7 @@ function renderWeek() {
   const grid = $('week-grid');
   grid.replaceChildren();
   const days = Array.from({ length: 7 }, (_, index) => addDays(state.weekStart, index));
+  const nowMinutes = taiwanCurrentMinutes();
   $('week-label').textContent = state.today > state.end ? '本年度調查已結束' : `${dateLabel(days[0])} — ${dateLabel(days[6])} · ${config.eventYear}`;
   $('calendar-range-label').textContent = state.today > state.end ? '已截止' : `${dateLabel(state.today)} — 12/14`;
   $('date-range-label').textContent = state.today > state.end ? '本年度調查已結束' : `${dateLabel(state.today)} — 12 月 14 日`;
@@ -59,9 +71,9 @@ function renderWeek() {
   grid.append(createElement('div', 'grid-corner', '時間'));
   for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
     const day = days[dayIndex];
-    const header = createElement('div', `day-header${dayEnabled(day) ? '' : ' unavailable'}`);
+    const header = createElement('div', `day-header${dayEnabled(day) ? '' : ' unavailable'}${day < state.today ? ' past' : ''}`);
     const title = createElement('strong', '', `${weekdays[dayIndex]} ${dateLabel(day)}`);
-    const count = createElement('span', '', state.ready && dayEnabled(day) ? `最多 ${bestCount(day)} 人` : '—');
+    const count = createElement('span', '', day < state.today ? '已過' : state.ready && dayEnabled(day) ? `最多 ${bestCount(day)} 人` : '—');
     header.append(title, count);
     grid.append(header);
   }
@@ -74,16 +86,18 @@ function renderWeek() {
     grid.append(createElement('div', 'time-label', time));
     for (const day of days) {
       const enabled = dayEnabled(day);
+      const past = isPastStart(day, index, nowMinutes);
+      const cannotStart = index > lastStartIndex;
       const chosen = state.selections.has(cellKey(day, time));
       const count = state.counts.get(cellKey(day, time)) || 0;
-      const cell = createElement('button', `time-cell${chosen ? ' chosen' : ''}${index % 2 === 0 ? ' hour-start' : ''}`);
+      const cell = createElement('button', `time-cell${chosen ? ' chosen' : ''}${index % 2 === 0 ? ' hour-start' : ''}${past ? ' past' : ''}${cannotStart ? ' nonstart' : ''}`);
       cell.type = 'button';
       cell.dataset.day = day;
       cell.dataset.index = String(index);
-      cell.disabled = !enabled || !state.ready || state.saving;
+      cell.disabled = !enabled || past || cannotStart || !state.ready || state.saving;
       cell.setAttribute('aria-pressed', String(chosen));
-      cell.setAttribute('aria-label', `${day} ${time}，${index <= times.length - mealCells ? `${count} 人可連續參加兩小時` : '無法在此時間開始完整兩小時'}${chosen ? '，你已選取' : ''}`);
-      if (index <= times.length - mealCells && count > 0) cell.append(createElement('span', 'cell-count', `${count} 人`));
+      cell.setAttribute('aria-label', `${day} ${time}${cannotStart ? '，無法在此時間開始完整兩小時' : ` 至 ${timeAt(startMinutes + index * stepMinutes + mealCells * stepMinutes)}，${count} 人可參加`}${past ? '，已過' : ''}${chosen ? '，你已選取' : ''}`);
+      if (!past && !cannotStart && count > 0) cell.append(createElement('span', 'cell-count', `${count} 人`));
       grid.append(cell);
     }
   }
@@ -98,17 +112,59 @@ function renderAccount() {
   const hours = state.selections.size * stepMinutes / 60;
   $('selection-count').textContent = state.token ? `已標記 ${hours} 小時可參加時間` : '尚未登入';
 }
-function render() { renderWeek(); renderAccount(); }
+function statisticsRows() {
+  if (state.today > state.end) return [];
+  const rows = [];
+  const nowMinutes = taiwanCurrentMinutes();
+  for (let day = state.today; day <= state.end; day = addDays(day, 1)) {
+    for (let index = 0; index <= lastStartIndex; index++) {
+      if (isPastStart(day, index, nowMinutes)) continue;
+      rows.push({ day, start: times[index], end: timeAt(startMinutes + (index + mealCells) * stepMinutes), count: state.counts.get(cellKey(day, times[index])) || 0 });
+    }
+  }
+  return rows;
+}
+function renderStatistics() {
+  const list = $('statistics-list');
+  list.replaceChildren();
+  $('download-csv').disabled = !state.ready || state.today > state.end;
+  if (!state.ready) { list.append(createElement('li', 'statistics-empty', '載入統計中…')); return; }
+  const ranked = statisticsRows().filter((row) => row.count > 0).sort((a, b) => b.count - a.count || a.day.localeCompare(b.day) || a.start.localeCompare(b.start)).slice(0, 8);
+  if (!ranked.length) { list.append(createElement('li', 'statistics-empty', '目前尚無可完整參加兩小時的時段。')); return; }
+  for (const row of ranked) {
+    const item = createElement('li', 'statistics-item');
+    const weekday = weekdays[(utcDate(row.day).getUTCDay() + 6) % 7];
+    item.append(createElement('span', 'statistics-time', `${dateLabel(row.day)}（${weekday}） ${row.start}–${row.end}`), createElement('strong', 'statistics-count', `${row.count} 人`));
+    list.append(item);
+  }
+}
+function downloadStatistics() {
+  if (!state.ready || state.today > state.end) return;
+  const lines = ['日期,開始時間,結束時間,可參加人數', ...statisticsRows().map((row) => `${row.day},${row.start},${row.end},${row.count}`)];
+  const url = URL.createObjectURL(new Blob([`\uFEFF${lines.join('\r\n')}\r\n`], { type: 'text/csv;charset=utf-8' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `聚餐時間統計-${state.today}.csv`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function render() { renderWeek(); renderAccount(); renderStatistics(); }
 function clearDragPreview() {
   $('week-grid').querySelectorAll('.preview-add,.preview-remove').forEach((cell) => cell.classList.remove('preview-add', 'preview-remove'));
+}
+function dragRange(drag) {
+  const maxBlocks = Math.floor((times.length - drag.start) / mealCells);
+  const blocks = Math.min(maxBlocks, Math.max(1, Math.ceil((Math.max(drag.start, drag.end) - drag.start + 1) / mealCells)));
+  return { from: drag.start, to: drag.start + blocks * mealCells - 1 };
 }
 function paintDragPreview() {
   clearDragPreview();
   if (!state.drag) return;
-  const { day, start, end, selected } = state.drag;
+  const { day, selected } = state.drag;
+  const { from, to } = dragRange(state.drag);
   for (const cell of $('week-grid').querySelectorAll('.time-cell')) {
     const index = Number(cell.dataset.index);
-    if (cell.dataset.day === day && index >= Math.min(start, end) && index <= Math.max(start, end)) {
+    if (cell.dataset.day === day && index >= from && index <= to) {
       cell.classList.add(selected ? 'preview-add' : 'preview-remove');
     }
   }
@@ -124,7 +180,8 @@ function startDrag(event) {
   event.preventDefault();
   const day = cell.dataset.day;
   const index = Number(cell.dataset.index);
-  state.drag = { day, start: index, end: index, selected: !state.selections.has(cellKey(day, times[index])) };
+  const wholeBlockChosen = times.slice(index, index + mealCells).every((time) => state.selections.has(cellKey(day, time)));
+  state.drag = { day, start: index, end: index, selected: !wholeBlockChosen };
   $('week-grid').setPointerCapture(event.pointerId);
   paintDragPreview();
 }
@@ -137,12 +194,13 @@ function moveDrag(event) {
   }
 }
 async function commitDrag(drag) {
+  const { from, to } = dragRange(drag);
   state.saving = true;
   renderWeek();
   try {
-    const result = await api('paint', { day: drag.day, from: times[Math.min(drag.start, drag.end)], to: times[Math.max(drag.start, drag.end)], selected: drag.selected });
+    const result = await api('paint', { day: drag.day, from: times[from], to: times[to], selected: drag.selected });
     applySnapshot(result);
-    setStatus(`已儲存 ${drag.day} ${times[Math.min(drag.start, drag.end)]}–${times[Math.max(drag.start, drag.end)]} 的選擇。`);
+    setStatus(`已儲存 ${drag.day} ${times[from]}–${timeAt(startMinutes + (to + 1) * stepMinutes)} 的選擇。`);
   } catch (error) {
     setStatus(error.message, true);
     if (error.status === 401) { localStorage.removeItem(sessionKey); state.token = ''; state.selections.clear(); }
@@ -226,8 +284,11 @@ $('week-grid').addEventListener('keydown', (event) => {
   event.preventDefault();
   if (!state.token) { $('account-dialog').showModal(); return; }
   const index = Number(cell.dataset.index);
-  commitDrag({ day: cell.dataset.day, start: index, end: index, selected: !state.selections.has(cellKey(cell.dataset.day, times[index])) });
+  const day = cell.dataset.day;
+  const wholeBlockChosen = times.slice(index, index + mealCells).every((time) => state.selections.has(cellKey(day, time)));
+  commitDrag({ day, start: index, end: index, selected: !wholeBlockChosen });
 });
+$('download-csv').addEventListener('click', downloadStatistics);
 $('account-button').addEventListener('click', () => state.token ? logout() : $('account-dialog').showModal());
 $('footer-account-button').addEventListener('click', () => $('account-dialog').showModal());
 $('close-dialog').addEventListener('click', () => $('account-dialog').close());

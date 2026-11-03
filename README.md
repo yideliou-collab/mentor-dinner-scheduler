@@ -8,9 +8,13 @@ GitHub repository：<https://github.com/yideliou-collab/mentor-dinner-scheduler>
 
 ## 時間選取方式
 
-- 週曆顯示每天 10:00–22:00，以 30 分鐘為一格；按住並拖曳可畫出任意長度的可參加時間，再次拖曳已選區域可取消。
-- 聚餐預計約兩小時。公開數字代表從該格開始，能**連續參加兩小時**的人數。因此某人只勾選一小段時，不會增加兩小時成團人數。
+- 週曆顯示每天 10:00–22:00，以 30 分鐘為起始時間間距。點一下選取從該時間開始的 **兩小時**；向下拖曳可增加更多完整兩小時區間。再次選取已標記的區間可取消。最晚可從 20:00 開始。
+- 公開數字代表從該格開始，能**連續參加兩小時**的人數。過去日期與今天已過的起始時間會顯示為灰色並停止選取；舊資料不會被刪除。
 - 每週可左右捲動，也可用箭頭切換週次。日期範圍由台灣時間的今日起算，至 2026 年 12 月 14 日。
+
+## 查看統計
+
+日曆下方的「最容易成團的兩小時」會依可完整參加的人數列出前八個候選時段；「下載完整統計 CSV」包含從現在到截止日所有可開始的兩小時時段，欄位為日期、開始時間、結束時間及可參加人數，零人時段也會列入。可用 Excel 開啟 CSV，再依人數排序或篩選日期。統計是匿名人數，**不提供參加者名單**；選定聚餐時間後，仍需另行請同學確認是否出席。
 
 若要更改每天可選時間、格距或聚餐長度，須同步修改 `config.js`、`supabase/functions/availability/index.ts` 與 `supabase/schema.sql`，再重新執行 SQL 並部署後端與網站。目前後端的連續兩小時計算固定為四個半小時格。
 
@@ -30,7 +34,7 @@ GitHub Pages 只能提供靜態檔案，無法自行儲存所有學生的選擇�
    ```
 
 4. 在 Supabase 的 **Project Settings → API** 取得 Project URL 和 publishable key，填入 `config.js` 的 `supabaseUrl`、`supabaseAnonKey`。**切勿填入 `service_role` key**。`SUPABASE_URL` 與 `SUPABASE_SERVICE_ROLE_KEY` 由 Supabase Edge Functions 的環境提供，僅在伺服器端使用。
-5. 在本目錄執行 `node preview.mjs`，開啟 `http://127.0.0.1:8765/` 預覽。用兩組不同代號與 PIN 測試：第一組拖曳選取四個連續半小時格、第二組可見該起始時間的人數增加但看不到第一組代號；第一組再次登入可取消。請透過預覽網址開啟，直接開啟 `index.html` 可能因瀏覽器對本機模組檔案的限制而無法執行。
+5. 在本目錄執行 `node preview.mjs`，開啟 `http://127.0.0.1:8765/` 預覽。用兩組不同代號與 PIN 測試：第一組點選一個兩小時區間、第二組可見該起始時間的人數增加但看不到第一組代號；第一組再次登入可取消。請透過預覽網址開啟，直接開啟 `index.html` 可能因瀏覽器對本機模組檔案的限制而無法執行。
 
 ## 發佈到 GitHub Pages
 
@@ -48,7 +52,7 @@ GitHub Pages 只能提供靜態檔案，無法自行儲存所有學生的選擇�
 | 檔案 | 用途 |
 | --- | --- |
 | `index.html`, `styles.css`, `calendar.css` | 繁體中文頁面與響應式週曆 |
-| `app.js`, `config.js` | 台灣日期、拖曳選取、登入與選填 |
+| `app.js`, `config.js` | 台灣日期、兩小時選取、登入、匿名統計與 CSV 下載 |
 | `preview.mjs` | 本機預覽伺服器，不會發佈到 GitHub Pages |
 | `supabase/schema.sql` | 私有資料表與統計函式 |
 | `supabase/migrations/20261103160000_initial.sql` | 可部署的資料庫 migration |
@@ -63,3 +67,5 @@ GitHub Pages 只能提供靜態檔案，無法自行儲存所有學生的選擇�
 ## 已完成驗證
 
 2026-11-03 已以兩組隨機測試代號驗證登入、拖曳四格、公開兩小時人數、重複登入與取消；測試時段已清空。公開金鑰無法直接讀取 `participants`、`sessions` 或 `availability`。另以含中文、空白與符號的代號及 4 位 PIN 驗證首次建立與重複登入。正式網站的首頁、程式與日曆樣式均回傳 HTTP 200，GitHub Pages → Supabase 的跨網域預檢回傳 HTTP 200。尚未完成實際瀏覽器畫面與觸控拖曳檢查。
+
+本次兩小時選取更新通過 `node --check app.js`、`node --test tests/calendar-logic.test.mjs` 與正式後端測試：不足兩小時的新增請求回傳 400，完整兩小時可儲存並清除；測試時段已清空。網站部署後仍需人工檢查實際觸控拖曳畫面。
