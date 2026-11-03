@@ -5,8 +5,8 @@ const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 const pepper = Deno.env.get('ACCOUNT_PEPPER');
 const supabase = url && serviceKey ? createClient(url, serviceKey, { auth: { persistSession: false } }) : null;
 const encoder = new TextEncoder();
-const allowedSlots = Array.from({ length: 24 }, (_, index) => {
-  const minutes = 10 * 60 + index * 30;
+const allowedSlots = Array.from({ length: 48 }, (_, index) => {
+  const minutes = index * 30;
   return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
 });
 const eventYear = 2026;
@@ -109,8 +109,8 @@ async function paint(request: Request, body: Record<string, unknown>) {
   if (!validDay || day < today || day > end || from < 0 || to < from || typeof body.selected !== 'boolean') {
     throw new HttpError(400, '日期或時間不在可選範圍內。');
   }
-  if (body.selected && (from > allowedSlots.length - 4 || (to - from + 1) % 4 !== 0 || (day === today && 10 * 60 + from * 30 < currentMinutesInTaiwan()))) {
-    throw new HttpError(400, '請選擇尚未開始的完整兩小時時段。');
+  if (body.selected && (from > allowedSlots.length - 4 || to - from + 1 < 4 || (day === today && from * 30 < currentMinutesInTaiwan()))) {
+    throw new HttpError(400, '請選擇尚未開始、至少四格（兩小時）的時段。');
   }
   const slots = allowedSlots.slice(from, to + 1);
   if (body.selected) {

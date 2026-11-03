@@ -5,7 +5,7 @@ const sessionKey = 'dinner-scheduler-session-v1';
 const weekdays = ['週一', '週二', '週三', '週四', '週五', '週六', '週日'];
 const stepMinutes = Number(config.stepMinutes) || 30;
 const mealCells = Math.ceil((Number(config.mealMinutes) || 120) / stepMinutes);
-const startMinutes = (Number(config.startHour) || 10) * 60;
+const startMinutes = Number(config.startHour ?? 10) * 60;
 const endMinutes = (Number(config.endHour) || 22) * 60;
 const times = Array.from({ length: (endMinutes - startMinutes) / stepMinutes }, (_, index) => {
   const minutes = startMinutes + index * stepMinutes;
@@ -15,7 +15,7 @@ const lastStartIndex = times.length - mealCells;
 const state = {
   today: '', end: `${Number(config.eventYear)}-12-14`, weekStart: '',
   counts: new Map(), selections: new Set(), token: localStorage.getItem(sessionKey) || '',
-  ready: false, saving: false, drag: null,
+  ready: false, saving: false, drag: null, eraseMode: false,
 };
 const $ = (id) => document.getElementById(id);
 const cellKey = (day, time) => `${day}|${time}`;
@@ -111,6 +111,8 @@ function renderAccount() {
   $('footer-account-button').disabled = Boolean(state.token) || !state.ready || state.today > state.end;
   const hours = state.selections.size * stepMinutes / 60;
   $('selection-count').textContent = state.token ? `已標記 ${hours} 小時可參加時間` : '尚未登入';
+  $('erase-mode').textContent = state.eraseMode ? '刪除模式：開' : '刪除模式：關';
+  $('erase-mode').setAttribute('aria-pressed', String(state.eraseMode));
 }
 function statisticsRows() {
   if (state.today > state.end) return [];
@@ -153,10 +155,10 @@ function clearDragPreview() {
   $('week-grid').querySelectorAll('.preview-add,.preview-remove').forEach((cell) => cell.classList.remove('preview-add', 'preview-remove'));
 }
 function dragRange(drag) {
-  const maxBlocks = Math.floor((times.length - drag.start) / mealCells);
-  const blocks = Math.min(maxBlocks, Math.max(1, Math.ceil((Math.max(drag.start, drag.end) - drag.start + 1) / mealCells)));
-  return { from: drag.start, to: drag.start + blocks * mealCells - 1 };
+  const from = Math.min(drag.start, drag.end);
+  return { from, to: Math.min(times.length - 1, Math.max(drag.start + mealCells - 1, drag.end)) };
 }
+function selectionForPointer(button, eraseMode) { return button !== 2 && !eraseMode; }
 function paintDragPreview() {
   clearDragPreview();
   if (!state.drag) return;
@@ -175,13 +177,12 @@ function hitCell(event) {
 }
 function startDrag(event) {
   const cell = event.target.closest('.time-cell');
-  if (!cell || cell.disabled || state.saving || event.button !== 0) return;
+  if (!cell || cell.disabled || state.saving || (event.button !== 0 && event.button !== 2)) return;
   if (!state.token) { $('account-dialog').showModal(); return; }
   event.preventDefault();
   const day = cell.dataset.day;
   const index = Number(cell.dataset.index);
-  const wholeBlockChosen = times.slice(index, index + mealCells).every((time) => state.selections.has(cellKey(day, time)));
-  state.drag = { day, start: index, end: index, selected: !wholeBlockChosen };
+  state.drag = { day, start: index, end: index, selected: selectionForPointer(event.button, state.eraseMode) };
   $('week-grid').setPointerCapture(event.pointerId);
   paintDragPreview();
 }
@@ -277,17 +278,20 @@ $('week-grid').addEventListener('pointerdown', startDrag);
 $('week-grid').addEventListener('pointermove', moveDrag);
 $('week-grid').addEventListener('pointerup', endDrag);
 $('week-grid').addEventListener('pointercancel', cancelDrag);
+$('week-grid').addEventListener('contextmenu', (event) => {
+  if (event.target.closest('.time-cell')) event.preventDefault();
+});
 $('week-grid').addEventListener('keydown', (event) => {
-  if (event.key !== 'Enter' && event.key !== ' ') return;
+  if (!['Enter', ' ', 'Delete', 'Backspace'].includes(event.key)) return;
   const cell = event.target.closest('.time-cell');
   if (!cell || cell.disabled || state.saving) return;
   event.preventDefault();
   if (!state.token) { $('account-dialog').showModal(); return; }
   const index = Number(cell.dataset.index);
   const day = cell.dataset.day;
-  const wholeBlockChosen = times.slice(index, index + mealCells).every((time) => state.selections.has(cellKey(day, time)));
-  commitDrag({ day, start: index, end: index, selected: !wholeBlockChosen });
+  commitDrag({ day, start: index, end: index, selected: (event.key === 'Enter' || event.key === ' ') && !state.eraseMode });
 });
+$('erase-mode').addEventListener('click', () => { state.eraseMode = !state.eraseMode; renderAccount(); });
 $('download-csv').addEventListener('click', downloadStatistics);
 $('account-button').addEventListener('click', () => state.token ? logout() : $('account-dialog').showModal());
 $('footer-account-button').addEventListener('click', () => $('account-dialog').showModal());

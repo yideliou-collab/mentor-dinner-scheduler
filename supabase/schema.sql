@@ -44,7 +44,7 @@ as $$
   join public.availability c on c.participant_id = a.participant_id and c.day = a.day and c.slot = to_char(date '2000-01-01' + a.slot::time + interval '60 minutes', 'HH24:MI')
   join public.availability d on d.participant_id = a.participant_id and d.day = a.day and d.slot = to_char(date '2000-01-01' + a.slot::time + interval '90 minutes', 'HH24:MI')
   where a.day between (now() at time zone 'Asia/Taipei')::date and date '2026-12-14'
-    and a.slot::time between time '10:00' and time '20:00'
+    and a.slot::time between time '00:00' and time '22:00'
   group by a.day, a.slot
   order by a.day, a.slot;
 $$;

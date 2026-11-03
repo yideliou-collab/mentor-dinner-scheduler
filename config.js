@@ -4,8 +4,8 @@ window.DINNER_CONFIG = {
   eventYear: 2026,
   supabaseUrl: 'https://xnjjptqxzimrfprsyxmb.supabase.co',
   supabaseAnonKey: 'sb_publishable_NwgsDDAfE4NCAPtSrWw7AA_YangO0rV',
-  startHour: 10,
-  endHour: 22,
+  startHour: 0,
+  endHour: 24,
   stepMinutes: 30,
   mealMinutes: 120,
 };
