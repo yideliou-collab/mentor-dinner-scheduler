@@ -14,7 +14,7 @@ const times = Array.from({ length: (endMinutes - startMinutes) / stepMinutes }, 
 const lastStartIndex = times.length - mealCells;
 const state = {
   today: '', end: `${Number(config.eventYear)}-12-14`, weekStart: '',
-  counts: new Map(), selections: new Set(), token: localStorage.getItem(sessionKey) || '',
+  counts: new Map(), cellCounts: new Map(), selections: new Set(), token: localStorage.getItem(sessionKey) || '',
   ready: false, saving: false, drag: null, eraseMode: false,
 };
 const $ = (id) => document.getElementById(id);
@@ -43,6 +43,10 @@ function setStatus(message, error = false) {
   $('status').classList.toggle('error', error);
 }
 function dayEnabled(day) { return day >= state.today && day <= state.end; }
+function adjacentToSelection(day, index) {
+  return (index > 0 && state.selections.has(cellKey(day, times[index - 1]))) ||
+    (index < times.length - 1 && state.selections.has(cellKey(day, times[index + 1])));
+}
 function bestCount(day) {
   const nowMinutes = taiwanCurrentMinutes();
   return Math.max(0, ...times.slice(0, lastStartIndex + 1).map((time, index) => isPastStart(day, index, nowMinutes) ? 0 : state.counts.get(cellKey(day, time)) || 0));
@@ -87,17 +91,18 @@ function renderWeek() {
     for (const day of days) {
       const enabled = dayEnabled(day);
       const past = isPastStart(day, index, nowMinutes);
-      const cannotStart = index > lastStartIndex;
+      const cannotStart = index > lastStartIndex && !adjacentToSelection(day, index);
       const chosen = state.selections.has(cellKey(day, time));
-      const count = state.counts.get(cellKey(day, time)) || 0;
+      const count = state.cellCounts.get(cellKey(day, time)) || 0;
+      const mealCount = state.counts.get(cellKey(day, time)) || 0;
       const cell = createElement('button', `time-cell${chosen ? ' chosen' : ''}${index % 2 === 0 ? ' hour-start' : ''}${past ? ' past' : ''}${cannotStart ? ' nonstart' : ''}`);
       cell.type = 'button';
       cell.dataset.day = day;
       cell.dataset.index = String(index);
-      cell.disabled = !enabled || past || cannotStart || !state.ready || state.saving;
+      cell.disabled = !enabled || past || (!chosen && cannotStart) || !state.ready || state.saving;
       cell.setAttribute('aria-pressed', String(chosen));
-      cell.setAttribute('aria-label', `${day} ${time}${cannotStart ? '，無法在此時間開始完整兩小時' : ` 至 ${timeAt(startMinutes + index * stepMinutes + mealCells * stepMinutes)}，${count} 人可參加`}${past ? '，已過' : ''}${chosen ? '，你已選取' : ''}`);
-      if (!past && !cannotStart && count > 0) cell.append(createElement('span', 'cell-count', `${count} 人`));
+      cell.setAttribute('aria-label', `${day} ${time} 至 ${timeAt(startMinutes + (index + 1) * stepMinutes)}，此半小時 ${count} 人可參加${index <= lastStartIndex ? `，從此開始連續兩小時 ${mealCount} 人可參加` : ''}${past ? '，已過' : ''}${chosen ? '，你已選取' : ''}`);
+      if (!past && count > 0) cell.append(createElement('span', 'cell-count', `${count} 人`));
       grid.append(cell);
     }
   }
@@ -111,7 +116,7 @@ function renderAccount() {
   $('footer-account-button').disabled = Boolean(state.token) || !state.ready || state.today > state.end;
   const hours = state.selections.size * stepMinutes / 60;
   $('selection-count').textContent = state.token ? `已標記 ${hours} 小時可參加時間` : '尚未登入';
-  $('erase-mode').textContent = state.eraseMode ? '刪除模式：開' : '刪除模式：關';
+  $('add-mode').setAttribute('aria-pressed', String(!state.eraseMode));
   $('erase-mode').setAttribute('aria-pressed', String(state.eraseMode));
 }
 function statisticsRows() {
@@ -156,9 +161,10 @@ function clearDragPreview() {
 }
 function dragRange(drag) {
   const from = Math.min(drag.start, drag.end);
-  return { from, to: Math.min(times.length - 1, Math.max(drag.start + mealCells - 1, drag.end)) };
+  return { from, to: Math.min(times.length - 1, Math.max(drag.start + drag.minCells - 1, drag.end)) };
 }
 function selectionForPointer(button, eraseMode) { return button !== 2 && !eraseMode; }
+function dragMinimum(day, index, selected) { return selected && !adjacentToSelection(day, index) ? mealCells : 1; }
 function paintDragPreview() {
   clearDragPreview();
   if (!state.drag) return;
@@ -182,7 +188,11 @@ function startDrag(event) {
   event.preventDefault();
   const day = cell.dataset.day;
   const index = Number(cell.dataset.index);
-  state.drag = { day, start: index, end: index, selected: selectionForPointer(event.button, state.eraseMode) };
+  const selected = selectionForPointer(event.button, state.eraseMode);
+  const chosen = state.selections.has(cellKey(day, times[index]));
+  if (selected && chosen) { setStatus('這格已選取；點相鄰的空白格可延長。要移除請按右鍵，手機請選「刪除時間」。'); return; }
+  if (!selected && !chosen) return;
+  state.drag = { day, start: index, end: index, selected, minCells: dragMinimum(day, index, selected) };
   $('week-grid').setPointerCapture(event.pointerId);
   paintDragPreview();
 }
@@ -229,6 +239,7 @@ async function api(action, body = {}, token = state.token) {
 }
 function applySnapshot(data) {
   state.counts = new Map((data.counts || []).map((item) => [cellKey(item.day, item.slot), Number(item.attendees)]));
+  state.cellCounts = new Map((data.cellCounts || []).map((item) => [cellKey(item.day, item.slot), Number(item.attendees)]));
   state.selections = new Set((data.selections || []).map((item) => cellKey(item.day, item.slot)));
   state.ready = true;
   render();
@@ -289,9 +300,14 @@ $('week-grid').addEventListener('keydown', (event) => {
   if (!state.token) { $('account-dialog').showModal(); return; }
   const index = Number(cell.dataset.index);
   const day = cell.dataset.day;
-  commitDrag({ day, start: index, end: index, selected: (event.key === 'Enter' || event.key === ' ') && !state.eraseMode });
+  const selected = (event.key === 'Enter' || event.key === ' ') && !state.eraseMode;
+  const chosen = state.selections.has(cellKey(day, times[index]));
+  if (selected && chosen) { setStatus('這格已選取；點相鄰的空白格可延長。'); return; }
+  if (!selected && !chosen) return;
+  commitDrag({ day, start: index, end: index, selected, minCells: dragMinimum(day, index, selected) });
 });
-$('erase-mode').addEventListener('click', () => { state.eraseMode = !state.eraseMode; renderAccount(); });
+$('add-mode').addEventListener('click', () => { state.eraseMode = false; renderAccount(); });
+$('erase-mode').addEventListener('click', () => { state.eraseMode = true; renderAccount(); });
 $('download-csv').addEventListener('click', downloadStatistics);
 $('account-button').addEventListener('click', () => state.token ? logout() : $('account-dialog').showModal());
 $('footer-account-button').addEventListener('click', () => $('account-dialog').showModal());

@@ -49,6 +49,8 @@ async function participantFromRequest(request: Request, required = false): Promi
 async function snapshot(participantId: string | null) {
   const { data: counts, error: countsError } = await supabase!.rpc('slot_counts');
   if (countsError) throw countsError;
+  const { data: cellCounts, error: cellCountsError } = await supabase!.rpc('cell_counts');
+  if (cellCountsError) throw cellCountsError;
   let selections: Array<{ day: string; slot: string }> = [];
   if (participantId) {
     for (let offset = 0; ; offset += 1000) {
@@ -58,7 +60,7 @@ async function snapshot(participantId: string | null) {
       if (!data || data.length < 1000) break;
     }
   }
-  return { counts: counts || [], selections };
+  return { counts: counts || [], cellCounts: cellCounts || [], selections };
 }
 async function login(body: Record<string, unknown>) {
   const accountName = String(body.accountName || '').trim().normalize('NFKC').toLocaleLowerCase('zh-TW');
@@ -109,11 +111,20 @@ async function paint(request: Request, body: Record<string, unknown>) {
   if (!validDay || day < today || day > end || from < 0 || to < from || typeof body.selected !== 'boolean') {
     throw new HttpError(400, '日期或時間不在可選範圍內。');
   }
-  if (body.selected && (from > allowedSlots.length - 4 || to - from + 1 < 4 || (day === today && from * 30 < currentMinutesInTaiwan()))) {
-    throw new HttpError(400, '請選擇尚未開始、至少四格（兩小時）的時段。');
-  }
+  if (body.selected && day === today && from * 30 < currentMinutesInTaiwan()) throw new HttpError(400, '已過時間不能新增。');
   const slots = allowedSlots.slice(from, to + 1);
   if (body.selected) {
+    if (slots.length < 4) {
+      const { data: existing, error: readError } = await supabase!.from('availability').select('slot').eq('participant_id', participantId).eq('day', day);
+      if (readError) throw readError;
+      const filled = new Set((existing || []).map((row) => allowedSlots.indexOf(row.slot)).filter((index) => index >= 0));
+      for (let index = from; index <= to; index++) filled.add(index);
+      let first = from;
+      let last = to;
+      while (filled.has(first - 1)) first--;
+      while (filled.has(last + 1)) last++;
+      if (last - first + 1 < 4) throw new HttpError(400, '新時段須至少四格；已有時段可逐格延長。');
+    }
     const rows = slots.map((slot) => ({ participant_id: participantId, day, slot }));
     const { error } = await supabase!.from('availability').upsert(rows, { onConflict: 'participant_id,day,slot' });
     if (error) throw error;

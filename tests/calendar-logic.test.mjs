@@ -22,15 +22,19 @@ const context = {
 runInNewContext(`${logic}
   state.today = '2026-11-03';
   state.end = '2026-12-14';
-  globalThis.testApi = { dragRange, selectionForPointer, isPastStart, statisticsRows, state };`, context);
+  globalThis.testApi = { dragRange, dragMinimum, selectionForPointer, isPastStart, statisticsRows, state };`, context);
 
-const { dragRange, selectionForPointer, isPastStart, statisticsRows, state } = context.testApi;
-assert.deepEqual({ ...dragRange({ start: 0, end: 0 }) }, { from: 0, to: 3 });
-assert.deepEqual({ ...dragRange({ start: 1, end: 4 }) }, { from: 1, to: 4 });
-assert.deepEqual({ ...dragRange({ start: 1, end: 5 }) }, { from: 1, to: 5 });
-assert.deepEqual({ ...dragRange({ start: 41, end: 45 }) }, { from: 41, to: 45 });
-assert.deepEqual({ ...dragRange({ start: 44, end: 47 }) }, { from: 44, to: 47 });
-assert.deepEqual({ ...dragRange({ start: 44, end: 43 }) }, { from: 43, to: 47 });
+const { dragRange, dragMinimum, selectionForPointer, isPastStart, statisticsRows, state } = context.testApi;
+const day = '2026-11-04';
+assert.equal(dragMinimum(day, 20, true), 4);
+assert.deepEqual({ ...dragRange({ start: 20, end: 20, minCells: 4 }) }, { from: 20, to: 23 });
+assert.deepEqual({ ...dragRange({ start: 20, end: 24, minCells: 4 }) }, { from: 20, to: 24 });
+state.selections = new Set([20, 21, 22, 23].map((index) => `${day}|${String(Math.floor(index / 2)).padStart(2, '0')}:${index % 2 ? '30' : '00'}`));
+assert.equal(dragMinimum(day, 24, true), 1);
+assert.deepEqual({ ...dragRange({ start: 24, end: 24, minCells: 1 }) }, { from: 24, to: 24 });
+assert.equal(dragMinimum(day, 30, true), 4);
+assert.deepEqual({ ...dragRange({ start: 44, end: 47, minCells: 4 }) }, { from: 44, to: 47 });
+assert.deepEqual({ ...dragRange({ start: 44, end: 43, minCells: 4 }) }, { from: 43, to: 47 });
 assert.equal(selectionForPointer(0, false), true);
 assert.equal(selectionForPointer(2, false), false);
 assert.equal(selectionForPointer(0, true), false);
