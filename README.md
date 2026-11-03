@@ -1,6 +1,10 @@
 # 導生聚餐時間調查
 
-可放在 GitHub Pages 的靜態網站。日期依 **Asia/Taipei** 每天自動從當日更新至 **2026 年 12 月 14 日**；截止後停止選填，不會在隔年自動重開。學生可先看匿名人數，再以自訂代號與 4 位數 PIN 登入、重複修改可參加時段。聚餐地點為校內 LALA Kitchen；科學三館 SC451 是老師辦公室。
+正式網站：<https://yideliou-collab.github.io/mentor-dinner-scheduler/>
+
+GitHub repository：<https://github.com/yideliou-collab/mentor-dinner-scheduler>
+
+已發佈到 GitHub Pages 的靜態網站。日期依 **Asia/Taipei** 每天自動從當日更新至 **2026 年 12 月 14 日**；截止後停止選填，不會在隔年自動重開。學生可先看匿名人數，再以自訂代號與 4 位數 PIN 登入、重複修改可參加時段。聚餐地點為校內 LALA Kitchen；科學三館 SC451 是老師辦公室。
 
 ## 時間選取方式
 
@@ -30,9 +34,7 @@ GitHub Pages 只能提供靜態檔案，無法自行儲存所有學生的選擇�
 
 ## 發佈到 GitHub Pages
 
-把**此資料夾內容作為新 GitHub repository 的根目錄**。提交並推送至 `main`，在 repository 的 **Settings → Pages → Build and deployment** 選擇 **GitHub Actions**。`.github/workflows/deploy.yml` 會只發佈五個公開檔案：`index.html`、`styles.css`、`calendar.css`、`app.js`、`config.js`。Supabase SQL 與 Edge Function 原始碼保留在 repository 供維護，不會複製到網站產物。此流程依照 [GitHub Pages 官方文件](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site)；Edge Function 設定依照 [Supabase 官方文件](https://supabase.com/docs/guides/functions/deploy)。
-
-如果此資料夾維持在其他 repository 的子目錄，需把 workflow 移至該 repository 根目錄的 `.github/workflows/`，並將 `cp` 的來源改為 `dinner-scheduler/...`。
+此資料夾已作為獨立 repository `yideliou-collab/mentor-dinner-scheduler` 的根目錄，`main` 推送後由 `.github/workflows/deploy.yml` 自動發佈到 GitHub Pages。工作流程只發佈五個公開檔案：`index.html`、`styles.css`、`calendar.css`、`app.js`、`config.js`。Supabase SQL 與 Edge Function 原始碼保留在 repository 供維護，不會複製到網站產物。此流程依照 [GitHub Pages 官方文件](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site)；Edge Function 設定依照 [Supabase 官方文件](https://supabase.com/docs/guides/functions/deploy)。
 
 ## 隱私與帳號限制
 
@@ -60,4 +62,4 @@ GitHub Pages 只能提供靜態檔案，無法自行儲存所有學生的選擇�
 
 ## 已完成驗證
 
-2026-11-03 已以兩組隨機測試代號驗證登入、拖曳四格、公開兩小時人數、重複登入與取消；測試時段已清空。公開金鑰無法直接讀取 `participants`、`sessions` 或 `availability`。另以中文代號與 4 位 PIN 驗證首次建立及重複登入。本機預覽的首頁、樣式與程式均回傳 HTTP 200。尚未完成實際瀏覽器畫面檢查。
+2026-11-03 已以兩組隨機測試代號驗證登入、拖曳四格、公開兩小時人數、重複登入與取消；測試時段已清空。公開金鑰無法直接讀取 `participants`、`sessions` 或 `availability`。另以含中文、空白與符號的代號及 4 位 PIN 驗證首次建立與重複登入。正式網站的首頁、程式與日曆樣式均回傳 HTTP 200，GitHub Pages → Supabase 的跨網域預檢回傳 HTTP 200。尚未完成實際瀏覽器畫面與觸控拖曳檢查。
