@@ -65,17 +65,6 @@ function renderWeek() {
   grid.replaceChildren();
   const days = Array.from({ length: 7 }, (_, index) => addDays(state.weekStart, index));
   if (!days.includes(state.activeDay)) state.activeDay = days.find(dayEnabled) || '';
-  const dayJump = $('day-jump');
-  dayJump.replaceChildren();
-  days.forEach((day, index) => {
-    const button = createElement('button', '', `${weekdays[index].slice(-1)} ${dateLabel(day)}`);
-    button.type = 'button';
-    button.dataset.day = day;
-    button.dataset.index = String(index);
-    button.disabled = !dayEnabled(day);
-    if (day === state.activeDay) button.setAttribute('aria-current', 'date');
-    dayJump.append(button);
-  });
   const nowMinutes = taiwanCurrentMinutes();
   $('week-label').textContent = state.today > state.end ? '本年度調查已結束' : `${dateLabel(days[0])} — ${dateLabel(days[6])} · ${config.eventYear}`;
   $('calendar-range-label').textContent = state.today > state.end ? '已截止' : `${dateLabel(state.today)} — 12/14`;
@@ -127,13 +116,9 @@ function renderWeek() {
   }
 }
 function jumpToDay(day) {
-  const index = Array.from($('day-jump').children).findIndex((button) => button.dataset.day === day);
-  if (index < 0) return;
+  const index = day ? Math.round((utcDate(day) - utcDate(state.weekStart)) / 86400000) : -1;
+  if (index < 0 || index > 6) return;
   state.activeDay = day;
-  for (const button of $('day-jump').children) {
-    if (button.dataset.day === day) button.setAttribute('aria-current', 'date');
-    else button.removeAttribute('aria-current');
-  }
   const grid = $('week-grid');
   const header = grid.querySelectorAll('.day-header')[index];
   if (header) $('calendar-scroll').scrollLeft = Math.max(0, header.offsetLeft - grid.firstElementChild.offsetWidth);
@@ -149,6 +134,8 @@ function renderAccount() {
   $('account-button').disabled = !configured || (state.today > state.end && !state.token);
   $('footer-account-button').textContent = state.token ? '已登入 · 可直接拖曳' : '輸入代號，開始選擇 ↗';
   $('footer-account-button').disabled = Boolean(state.token) || !state.ready || state.today > state.end;
+  $('clear-week').disabled = !state.token || !state.ready || state.saving || state.today > state.end;
+  $('clear-all').disabled = !state.token || !state.ready || state.saving || state.today > state.end;
   const hours = state.selections.size * stepMinutes / 60;
   $('selection-count').textContent = state.token ? `已標記 ${hours} 小時可參加時間` : '尚未登入';
 }
@@ -245,6 +232,22 @@ async function commitDrag(drag) {
     const result = await api('paint', { day: drag.day, from: times[from], to: times[to], selected: drag.selected });
     applySnapshot(result);
     setStatus(`已儲存 ${drag.day} ${times[from]}–${timeAt(startMinutes + (to + 1) * stepMinutes)} 的選擇。`);
+  } catch (error) {
+    setStatus(error.message, true);
+    if (error.status === 401) { localStorage.removeItem(sessionKey); state.token = ''; state.selections.clear(); }
+  } finally { state.saving = false; render(); }
+}
+async function clearSelections(scope) {
+  if (!state.token || !state.ready || state.saving || state.today > state.end) return;
+  const weekStart = state.weekStart;
+  const message = scope === 'week' ? `確定取消 ${dateLabel(weekStart)}–${dateLabel(addDays(weekStart, 6))} 這一週的所有選取嗎？` : '確定取消你在所有日期的選取嗎？';
+  if (!window.confirm(message)) return;
+  state.saving = true;
+  render();
+  try {
+    const result = await api('clear', { scope, ...(scope === 'week' ? { weekStart } : {}) });
+    applySnapshot(result);
+    setStatus(scope === 'week' ? '已取消本週選取。' : '已取消所有選取。');
   } catch (error) {
     setStatus(error.message, true);
     if (error.status === 401) { localStorage.removeItem(sessionKey); state.token = ''; state.selections.clear(); }
@@ -373,13 +376,8 @@ $('week-grid').addEventListener('keydown', (event) => {
   if (!selected && !chosen) return;
   commitDrag({ day, start: index, end: index, selected, minCells: dragMinimum(day, index, selected) });
 });
-$('day-jump').addEventListener('click', (event) => {
-  const button = event.target.closest('button[data-day]');
-  if (button && !button.disabled) jumpToDay(button.dataset.day);
-});
-document.querySelectorAll('.time-jump button').forEach((button) => button.addEventListener('click', () => {
-  jumpToHour(button.dataset.hour === 'now' ? Math.max(0, taiwanCurrentMinutes() / 60 - 1) : Number(button.dataset.hour));
-}));
+$('clear-week').addEventListener('click', () => clearSelections('week'));
+$('clear-all').addEventListener('click', () => clearSelections('all'));
 $('download-csv').addEventListener('click', downloadStatistics);
 $('account-button').addEventListener('click', () => state.token ? logout() : $('account-dialog').showModal());
 $('footer-account-button').addEventListener('click', () => $('account-dialog').showModal());

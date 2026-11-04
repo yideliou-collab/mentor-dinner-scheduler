@@ -40,14 +40,14 @@ assert.equal(selectionForPointer(0, true), false);
 assert.equal(selectionForPointer(2, true), false);
 assert.deepEqual({ ...touchCenter([{ clientX: 20, clientY: 30 }, { clientX: 60, clientY: 90 }], 2) }, { x: 40, y: 60 });
 const scroll = { scrollLeft: 100, scrollTop: 200 };
-const dayButtons = ['2026-11-02', '2026-11-03', '2026-11-04'].map((value) => ({ dataset: { day: value }, setAttribute() {}, removeAttribute() {} }));
+state.weekStart = '2026-11-02';
 const grid = {
   firstElementChild: { offsetWidth: 57, offsetHeight: 58 },
   querySelectorAll: (selector) => selector === '.day-header'
     ? [{ offsetLeft: 57 }, { offsetLeft: 176 }, { offsetLeft: 295 }]
     : selector === '.time-label' ? Array.from({ length: 48 }, (_, index) => ({ offsetTop: 58 + index * 42 })) : [],
 };
-context.document = { getElementById: (id) => ({ 'calendar-scroll': scroll, 'day-jump': { children: dayButtons }, 'week-grid': grid })[id] };
+context.document = { getElementById: (id) => ({ 'calendar-scroll': scroll, 'week-grid': grid })[id] };
 jumpToDay('2026-11-04');
 assert.equal(scroll.scrollLeft, 238);
 jumpToHour(12);

@@ -134,6 +134,25 @@ async function paint(request: Request, body: Record<string, unknown>) {
   }
   return snapshot(participantId);
 }
+async function clearSelections(request: Request, body: Record<string, unknown>) {
+  const participantId = await participantFromRequest(request, true);
+  const scope = body.scope;
+  if (scope !== 'week' && scope !== 'all') throw new HttpError(400, '取消範圍不正確。');
+  let query = supabase!.from('availability').delete().eq('participant_id', participantId);
+  if (scope === 'week') {
+    const weekStart = String(body.weekStart || '');
+    const monday = /^\d{4}-\d{2}-\d{2}$/.test(weekStart) ? new Date(`${weekStart}T00:00:00Z`) : new Date(Number.NaN);
+    if (Number.isNaN(monday.getTime()) || monday.toISOString().slice(0, 10) !== weekStart || monday.getUTCDay() !== 1) {
+      throw new HttpError(400, '週次不正確。');
+    }
+    const sunday = new Date(monday);
+    sunday.setUTCDate(sunday.getUTCDate() + 6);
+    query = query.gte('day', weekStart).lte('day', sunday.toISOString().slice(0, 10));
+  }
+  const { error } = await query;
+  if (error) throw error;
+  return snapshot(participantId);
+}
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return new Response(null, { headers: cors });
   if (request.method !== 'POST') return json({ error: '不支援此操作。' }, 405);
@@ -144,6 +163,7 @@ Deno.serve(async (request) => {
       case 'snapshot': return json(await snapshot(await participantFromRequest(request)));
       case 'login': return json(await login(body));
       case 'paint': return json(await paint(request, body));
+      case 'clear': return json(await clearSelections(request, body));
       case 'logout': {
         const token = request.headers.get('x-session-token');
         if (token) {

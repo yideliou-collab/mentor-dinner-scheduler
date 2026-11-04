@@ -60,6 +60,8 @@ runInNewContext(readFileSync(new URL('../app.js', import.meta.url), 'utf8'), con
 await new Promise((resolve) => setTimeout(resolve, 0));
 
 assert.notEqual(ids['week-label'].textContent, '載入日期中…');
-assert.equal(ids['day-jump'].children.length, 7);
+assert.ok(!('day-jump' in ids), 'date and time shortcut buttons were removed');
 assert.equal(ids['week-grid'].querySelectorAll('.time-cell').length, 48 * 7);
-console.log('Calendar startup rendered seven dates and 336 time cells.');
+assert.equal(ids['clear-week'].disabled, true);
+assert.equal(ids['clear-all'].disabled, true);
+console.log('Calendar startup rendered 336 time cells and account-only clear buttons.');
