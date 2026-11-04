@@ -13,6 +13,7 @@ class FixedDate extends Date {
 
 const context = {
   window: { DINNER_CONFIG: { eventYear: 2026, startHour: 0, endHour: 24, stepMinutes: 30, mealMinutes: 120 } },
+  document: { querySelectorAll: () => [] },
   localStorage: { getItem: () => '' },
   Intl,
   Date: FixedDate,
@@ -22,9 +23,9 @@ const context = {
 runInNewContext(`${logic}
   state.today = '2026-11-03';
   state.end = '2026-12-14';
-  globalThis.testApi = { dragRange, dragMinimum, selectionForPointer, touchCenter, startTouchPan, moveTouchPan, endTouchPan, jumpToDay, jumpToHour, isPastStart, statisticsRows, state };`, context);
+  globalThis.testApi = { dragRange, dragMinimum, selectionForPointer, updateDragTarget, touchCenter, startTouchPan, moveTouchPan, endTouchPan, jumpToDay, jumpToHour, isPastStart, statisticsRows, state };`, context);
 
-const { dragRange, dragMinimum, selectionForPointer, touchCenter, startTouchPan, moveTouchPan, endTouchPan, jumpToDay, jumpToHour, isPastStart, statisticsRows, state } = context.testApi;
+const { dragRange, dragMinimum, selectionForPointer, updateDragTarget, touchCenter, startTouchPan, moveTouchPan, endTouchPan, jumpToDay, jumpToHour, isPastStart, statisticsRows, state } = context.testApi;
 const day = '2026-11-04';
 assert.equal(dragMinimum(day, 20, true), 4);
 assert.deepEqual({ ...dragRange({ start: 20, end: 20, minCells: 4 }) }, { from: 20, to: 23 });
@@ -32,6 +33,17 @@ assert.deepEqual({ ...dragRange({ start: 20, end: 24, minCells: 4 }) }, { from: 
 state.selections = new Set([20, 21, 22, 23].map((index) => `${day}|${String(Math.floor(index / 2)).padStart(2, '0')}:${index % 2 ? '30' : '00'}`));
 assert.equal(dragMinimum(day, 24, true), 1);
 assert.deepEqual({ ...dragRange({ start: 24, end: 24, minCells: 1 }) }, { from: 24, to: 24 });
+assert.equal(dragMinimum(day, 19, true), 1);
+const upward = { day, start: 20, end: 20, selected: false, minCells: 1, extendFromChosen: true };
+updateDragTarget(upward, 19);
+assert.equal(upward.selected, true);
+assert.deepEqual({ ...dragRange(upward) }, { from: 19, to: 20 });
+updateDragTarget(upward, 20);
+assert.equal(upward.selected, false, 'a tap on a green cell still clears it');
+const downward = { day, start: 23, end: 23, selected: false, minCells: 1, extendFromChosen: true };
+updateDragTarget(downward, 24);
+assert.equal(downward.selected, true);
+assert.deepEqual({ ...dragRange(downward) }, { from: 23, to: 24 });
 assert.equal(dragMinimum(day, 30, true), 4);
 assert.deepEqual({ ...dragRange({ start: 44, end: 47, minCells: 4 }) }, { from: 44, to: 47 });
 assert.deepEqual({ ...dragRange({ start: 44, end: 43, minCells: 4 }) }, { from: 43, to: 47 });

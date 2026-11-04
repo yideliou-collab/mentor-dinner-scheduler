@@ -14,6 +14,7 @@ class Element {
     this.offsetHeight = 58;
     this.offsetLeft = 0;
     this.offsetTop = 0;
+    this.listeners = {};
     this.classList = { toggle() {}, remove() {}, add() {} };
   }
   append(...children) { this.children.push(...children); }
@@ -21,7 +22,7 @@ class Element {
   get firstElementChild() { return this.children[0]; }
   setAttribute() {}
   removeAttribute() {}
-  addEventListener() {}
+  addEventListener(name, handler) { this.listeners[name] = handler; }
   querySelectorAll(selector) {
     const classes = selector.split(',').map((part) => part.trim().slice(1));
     const result = [];
@@ -47,21 +48,35 @@ const document = {
   getElementById: (id) => ids[id] || null,
   createElement: () => new Element(),
   querySelectorAll: () => [],
+  documentElement: new Element(),
   hidden: false,
 };
+const stored = new Map();
 const context = {
   window: configContext.window,
   document,
-  localStorage: { getItem: () => '' },
+  localStorage: { getItem: (key) => stored.get(key) || '', setItem: (key, value) => stored.set(key, value) },
   fetch: async () => ({ ok: true, json: async () => ({ counts: [], cellCounts: [], selections: [] }) }),
   setInterval: () => 0,
 };
-runInNewContext(readFileSync(new URL('../app.js', import.meta.url), 'utf8'), context);
+const appSource = readFileSync(new URL('../app.js', import.meta.url), 'utf8');
+runInNewContext(`${appSource}\nglobalThis.englishTranslations = english;`, context);
 await new Promise((resolve) => setTimeout(resolve, 0));
 
+for (const [, key] of html.matchAll(/data-i18n(?:-aria|-placeholder)?="([^"]+)"/g)) {
+  assert.ok(key in context.englishTranslations, `missing English translation for ${key}`);
+}
 assert.notEqual(ids['week-label'].textContent, '載入日期中…');
 assert.ok(!('day-jump' in ids), 'date and time shortcut buttons were removed');
 assert.equal(ids['week-grid'].querySelectorAll('.time-cell').length, 48 * 7);
 assert.equal(ids['clear-week'].disabled, true);
 assert.equal(ids['clear-all'].disabled, true);
-console.log('Calendar startup rendered 336 time cells and account-only clear buttons.');
+assert.equal(ids['language-button'].textContent, 'EN');
+ids['language-button'].listeners.click();
+assert.equal(ids['language-button'].textContent, '中文');
+assert.equal(stored.get('dinner-scheduler-language-v1'), 'en');
+assert.equal(ids['week-grid'].querySelectorAll('.grid-corner')[0].textContent, 'Time');
+assert.equal(ids['selection-count'].textContent, 'Not signed in');
+ids['language-button'].listeners.click();
+assert.equal(ids['week-grid'].querySelectorAll('.grid-corner')[0].textContent, '時間');
+console.log('Calendar startup, language switching, and account-only clear buttons passed.');
