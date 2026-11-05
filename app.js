@@ -190,7 +190,10 @@ function renderWeek() {
   }
   for (let index = 0; index < times.length; index++) {
     const time = times[index];
-    grid.append(createElement('div', 'time-label', time));
+    const label = createElement('div', `time-label${index === 0 ? ' first-slot' : ''}${index % 2 === 0 ? ' hour-label' : ''}`);
+    label.append(createElement('span', 'time-label-text', time));
+    if (index === times.length - 1) label.append(createElement('span', 'time-end-text', timeAt(endMinutes)));
+    grid.append(label);
     for (const day of days) {
       const enabled = dayEnabled(day);
       const past = isPastStart(day, index, nowMinutes);

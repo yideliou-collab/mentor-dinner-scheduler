@@ -6,7 +6,7 @@
 .calendar-actions{display:flex;flex-wrap:wrap;gap:9px;margin:0 0 13px}
 .calendar-actions .button{min-height:40px;padding:0 17px;font-size:12px}
 .calendar-scroll{height:min(68vh,690px);min-height:360px;overflow:auto;border:1px solid #dce6dc;border-radius:15px;background:#fff;scrollbar-color:#a7b9a9 #f2f5f0;touch-action:none;overscroll-behavior:contain}
-.week-grid{display:grid;grid-template-columns:68px repeat(7,minmax(135px,1fr));min-width:1013px;align-content:start}
+.week-grid{display:grid;grid-template-columns:68px repeat(7,minmax(135px,1fr));min-width:1013px;align-content:start;padding-bottom:9px}
 .grid-corner,.day-header{position:sticky;top:0;z-index:3;min-height:58px;background:#f4f7f1;border-right:1px solid #dce6dc;border-bottom:1px solid #dce6dc}
 .grid-corner{left:0;z-index:5;display:grid;place-items:center;font-size:11px;color:#83978a;font-weight:700}
 .day-header{padding:9px 12px;display:flex;flex-direction:column;justify-content:center;gap:3px}
@@ -15,7 +15,11 @@
 .day-header.unavailable{color:#8d9690;background:#e8eae6}
 .day-header.unavailable span{color:#8d9690}
 .day-header.past strong{text-decoration:line-through;text-decoration-color:#a9b1aa}
-.time-label{position:sticky;left:0;z-index:2;background:#fff;border-right:1px solid #dce6dc;border-bottom:1px solid #e9eee8;height:38px;padding:8px 8px 0 0;text-align:right;color:#8a9a8d;font-size:11px;font-variant-numeric:tabular-nums}
+.time-label{position:sticky;left:0;z-index:2;background:#fff;border-right:1px solid #dce6dc;border-bottom:1px solid #e9eee8;height:38px;text-align:right;color:#8a9a8d;font-size:11px;font-variant-numeric:tabular-nums}
+.time-label.hour-label{color:#62796c;font-weight:700}
+.time-label-text,.time-end-text{position:absolute;right:8px;top:0;transform:translateY(-50%);background:#fff;padding:0 2px;line-height:1.2;white-space:nowrap}
+.time-label.first-slot .time-label-text{top:2px;transform:none}
+.time-end-text{top:100%;color:#62796c;font-weight:700}
 .time-cell{height:38px;border:0;border-right:1px solid #e5ece3;border-bottom:1px solid #e9eee8;background:#fff;color:#9d5b38;text-align:left;padding:0 8px;user-select:none;touch-action:none;position:relative;transition:background .12s}
 .time-cell.hour-start{border-top:1px solid #d4e0d4}
 .time-cell:hover:not(:disabled){background:#eef5ed}

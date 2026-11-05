@@ -69,6 +69,10 @@ for (const [, key] of html.matchAll(/data-i18n(?:-aria|-placeholder)?="([^"]+)"/
 assert.notEqual(ids['week-label'].textContent, '載入日期中…');
 assert.ok(!('day-jump' in ids), 'date and time shortcut buttons were removed');
 assert.equal(ids['week-grid'].querySelectorAll('.time-cell').length, 48 * 7);
+const timeLabels = ids['week-grid'].querySelectorAll('.time-label');
+assert.equal(timeLabels.length, 48);
+assert.equal(timeLabels[0].children[0].textContent, '00:00');
+assert.deepEqual(timeLabels.at(-1).children.map((child) => child.textContent), ['23:30', '24:00']);
 assert.equal(ids['clear-week'].disabled, true);
 assert.equal(ids['clear-all'].disabled, true);
 assert.equal(ids['language-button'].textContent, 'EN');
