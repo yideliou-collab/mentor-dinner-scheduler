@@ -42,7 +42,7 @@ for (const asset of ['styles.css', 'calendar.css', 'config.js', 'app.js']) {
   assert.ok(html.includes(`./${asset}?v=__BUILD_VERSION__`), `${asset} must use the deployment version`);
 }
 const ids = Object.fromEntries([...html.matchAll(/id="([^"]+)"/g)].map((match) => [match[1], new Element()]));
-const configContext = { window: {} };
+const configContext = { window: { addEventListener() {} } };
 runInNewContext(readFileSync(new URL('../config.js', import.meta.url), 'utf8'), configContext);
 const document = {
   getElementById: (id) => ids[id] || null,

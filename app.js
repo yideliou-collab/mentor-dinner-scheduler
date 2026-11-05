@@ -286,8 +286,11 @@ function clearDragPreview() {
   $('week-grid').querySelectorAll('.preview-add,.preview-remove').forEach((cell) => cell.classList.remove('preview-add', 'preview-remove'));
 }
 function dragRange(drag) {
-  const from = Math.min(drag.start, drag.end);
-  return { from, to: Math.min(times.length - 1, Math.max(drag.start + drag.minCells - 1, drag.end)) };
+  if (drag.end < drag.start) {
+    const from = Math.max(0, Math.min(drag.end, drag.start - drag.minCells + 1));
+    return { from, to: Math.min(times.length - 1, Math.max(drag.start, from + drag.minCells - 1)) };
+  }
+  return { from: drag.start, to: Math.min(times.length - 1, Math.max(drag.start + drag.minCells - 1, drag.end)) };
 }
 function selectionForPointer(button, chosen) { return button !== 2 && !chosen; }
 function dragMinimum(day, index, selected) { return selected && !adjacentToSelection(day, index) ? mealCells : 1; }
@@ -303,8 +306,22 @@ function paintDragPreview() {
     }
   }
 }
-function hitCell(event) {
-  const element = document.elementFromPoint(event.clientX, event.clientY);
+let dragScrollFrame = 0;
+function dragScrollStep(clientY, top, bottom) {
+  const edge = 52;
+  if (clientY < top + edge) return -Math.min(24, Math.max(2, Math.ceil((top + edge - clientY) / edge * 16)));
+  if (clientY > bottom - edge) return Math.min(24, Math.max(2, Math.ceil((clientY - bottom + edge) / edge * 16)));
+  return 0;
+}
+function hitCell(clientX, clientY) {
+  const scroll = $('calendar-scroll');
+  const bounds = scroll.getBoundingClientRect();
+  const corner = $('week-grid').firstElementChild;
+  const right = bounds.left + (scroll.clientWidth || bounds.right - bounds.left) - 2;
+  const bottom = bounds.top + (scroll.clientHeight || bounds.bottom - bounds.top) - 2;
+  const x = Math.max(bounds.left + corner.offsetWidth + 2, Math.min(clientX, right));
+  const y = Math.max(bounds.top + corner.offsetHeight + 2, Math.min(clientY, bottom));
+  const element = document.elementFromPoint(x, y);
   return element?.closest('.time-cell');
 }
 function updateDragTarget(drag, index) {
@@ -327,16 +344,45 @@ function startDrag(event) {
   const chosen = state.selections.has(cellKey(day, times[index]));
   const selected = selectionForPointer(event.button, chosen);
   if (!selected && !chosen) return;
-  state.drag = { day, start: index, end: index, selected, minCells: dragMinimum(day, index, selected), pointerId: event.pointerId, extendFromChosen: chosen && event.button === 0 };
+  state.drag = { day, start: index, end: index, selected, minCells: dragMinimum(day, index, selected), pointerId: event.pointerId, pointerType: event.pointerType, clientX: event.clientX, clientY: event.clientY, extendFromChosen: chosen && event.button === 0 };
   $('week-grid').setPointerCapture(event.pointerId);
   paintDragPreview();
 }
-function moveDrag(event) {
-  if (!state.drag) return;
-  const cell = hitCell(event);
-  if (cell && !cell.disabled && cell.dataset.day === state.drag.day) {
-    updateDragTarget(state.drag, Number(cell.dataset.index));
+function updateDragAtPointer(drag) {
+  const cell = hitCell(drag.clientX, drag.clientY);
+  if (cell && !cell.disabled && cell.dataset.day === drag.day) {
+    updateDragTarget(drag, Number(cell.dataset.index));
     paintDragPreview();
+  }
+}
+function autoScrollDrag() {
+  dragScrollFrame = 0;
+  const drag = state.drag;
+  if (!drag || drag.pointerType === 'touch') return;
+  const scroll = $('calendar-scroll');
+  const bounds = scroll.getBoundingClientRect();
+  const step = dragScrollStep(drag.clientY, bounds.top, bounds.bottom);
+  if (!step) return;
+  const before = scroll.scrollTop;
+  scroll.scrollTop += step;
+  if (scroll.scrollTop !== before) {
+    updateDragAtPointer(drag);
+    dragScrollFrame = requestAnimationFrame(autoScrollDrag);
+  }
+}
+function stopDragScroll() {
+  if (dragScrollFrame) cancelAnimationFrame(dragScrollFrame);
+  dragScrollFrame = 0;
+}
+function moveDrag(event) {
+  const drag = state.drag;
+  if (!drag || event.pointerId !== drag.pointerId) return;
+  drag.clientX = event.clientX;
+  drag.clientY = event.clientY;
+  updateDragAtPointer(drag);
+  if (drag.pointerType !== 'touch' && !dragScrollFrame) {
+    const bounds = $('calendar-scroll').getBoundingClientRect();
+    if (dragScrollStep(drag.clientY, bounds.top, bounds.bottom)) dragScrollFrame = requestAnimationFrame(autoScrollDrag);
   }
 }
 async function commitDrag(drag) {
@@ -372,18 +418,20 @@ async function clearSelections(scope) {
   } finally { state.saving = false; render(); }
 }
 function endDrag(event) {
-  if (!state.drag) return;
+  if (!state.drag || event.pointerId !== state.drag.pointerId) return;
   moveDrag(event);
-  if ($('week-grid').hasPointerCapture(event.pointerId)) $('week-grid').releasePointerCapture(event.pointerId);
   const drag = state.drag;
   state.drag = null;
+  stopDragScroll();
+  if ($('week-grid').hasPointerCapture(event.pointerId)) $('week-grid').releasePointerCapture(event.pointerId);
   clearDragPreview();
   commitDrag(drag);
 }
 function cancelDrag() {
   const pointerId = state.drag?.pointerId;
-  if (pointerId !== undefined && $('week-grid').hasPointerCapture(pointerId)) $('week-grid').releasePointerCapture(pointerId);
   state.drag = null;
+  stopDragScroll();
+  if (pointerId !== undefined && $('week-grid').hasPointerCapture(pointerId)) $('week-grid').releasePointerCapture(pointerId);
   clearDragPreview();
 }
 function touchCenter(touches, count) {
@@ -475,6 +523,8 @@ $('week-grid').addEventListener('pointerdown', startDrag);
 $('week-grid').addEventListener('pointermove', moveDrag);
 $('week-grid').addEventListener('pointerup', endDrag);
 $('week-grid').addEventListener('pointercancel', cancelDrag);
+$('week-grid').addEventListener('lostpointercapture', cancelDrag);
+window.addEventListener('blur', cancelDrag);
 $('calendar-scroll').addEventListener('touchstart', startTouchPan, { passive: false });
 $('calendar-scroll').addEventListener('touchmove', moveTouchPan, { passive: false });
 $('calendar-scroll').addEventListener('touchend', endTouchPan);

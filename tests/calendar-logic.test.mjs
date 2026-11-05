@@ -23,9 +23,9 @@ const context = {
 runInNewContext(`${logic}
   state.today = '2026-11-03';
   state.end = '2026-12-14';
-  globalThis.testApi = { dragRange, dragMinimum, selectionForPointer, updateDragTarget, touchCenter, startTouchPan, moveTouchPan, endTouchPan, jumpToDay, jumpToHour, isPastStart, statisticsRows, state };`, context);
+  globalThis.testApi = { dragRange, dragMinimum, selectionForPointer, updateDragTarget, dragScrollStep, moveDrag, cancelDrag, touchCenter, startTouchPan, moveTouchPan, endTouchPan, jumpToDay, jumpToHour, isPastStart, statisticsRows, state };`, context);
 
-const { dragRange, dragMinimum, selectionForPointer, updateDragTarget, touchCenter, startTouchPan, moveTouchPan, endTouchPan, jumpToDay, jumpToHour, isPastStart, statisticsRows, state } = context.testApi;
+const { dragRange, dragMinimum, selectionForPointer, updateDragTarget, dragScrollStep, moveDrag, cancelDrag, touchCenter, startTouchPan, moveTouchPan, endTouchPan, jumpToDay, jumpToHour, isPastStart, statisticsRows, state } = context.testApi;
 const day = '2026-11-04';
 assert.equal(dragMinimum(day, 20, true), 4);
 assert.deepEqual({ ...dragRange({ start: 20, end: 20, minCells: 4 }) }, { from: 20, to: 23 });
@@ -46,7 +46,8 @@ assert.equal(downward.selected, true);
 assert.deepEqual({ ...dragRange(downward) }, { from: 23, to: 24 });
 assert.equal(dragMinimum(day, 30, true), 4);
 assert.deepEqual({ ...dragRange({ start: 44, end: 47, minCells: 4 }) }, { from: 44, to: 47 });
-assert.deepEqual({ ...dragRange({ start: 44, end: 43, minCells: 4 }) }, { from: 43, to: 47 });
+assert.deepEqual({ ...dragRange({ start: 44, end: 43, minCells: 4 }) }, { from: 41, to: 44 });
+assert.deepEqual({ ...dragRange({ start: 2, end: 1, minCells: 4 }) }, { from: 0, to: 3 });
 assert.equal(selectionForPointer(0, false), true);
 assert.equal(selectionForPointer(0, true), false);
 assert.equal(selectionForPointer(2, true), false);
@@ -72,6 +73,52 @@ assert.equal(scroll.scrollLeft, 248);
 assert.equal(scroll.scrollTop, 24 * 42 + 10);
 endTouchPan({ touches: [] });
 assert.equal(state.touchPan, null);
+assert.equal(dragScrollStep(150, 0, 300), 0);
+assert.ok(dragScrollStep(295, 0, 300) > 0);
+assert.ok(dragScrollStep(5, 0, 300) < 0);
+scroll.getBoundingClientRect = () => ({ left: 0, right: 260, top: 0, bottom: 300 });
+scroll.clientWidth = 245;
+scroll.clientHeight = 285;
+grid.hasPointerCapture = () => false;
+let lastHit = null;
+context.document.elementFromPoint = (x, y) => { lastHit = { x, y }; return { closest: () => ({
+  disabled: false,
+  dataset: { day, index: String(Math.floor((y - 58 + scroll.scrollTop) / 42)) },
+}) }; };
+const frames = new Map();
+let frameId = 0;
+context.requestAnimationFrame = (callback) => { frames.set(++frameId, callback); return frameId; };
+context.cancelAnimationFrame = (id) => frames.delete(id);
+function runFrames(count) {
+  for (let index = 0; index < count; index++) {
+    const next = frames.entries().next().value;
+    assert.ok(next, 'drag scroll should schedule another frame');
+    frames.delete(next[0]);
+    next[1]();
+  }
+}
+scroll.scrollTop = 20 * 42;
+state.drag = { day, start: 20, end: 20, selected: true, minCells: 1, pointerId: 7, pointerType: 'mouse' };
+moveDrag({ pointerId: 7, clientX: 255, clientY: 295 });
+assert.ok(lastHit.x < scroll.clientWidth && lastHit.y < scroll.clientHeight, 'the hit test avoids scrollbar tracks');
+const firstEnd = state.drag.end;
+runFrames(5);
+assert.ok(scroll.scrollTop > 20 * 42);
+assert.ok(state.drag.end > firstEnd, 'downward auto-scroll extends the selection');
+cancelDrag();
+assert.equal(frames.size, 0, 'cancelling the drag stops auto-scroll');
+scroll.scrollTop = 20 * 42;
+state.drag = { day, start: 20, end: 20, selected: true, minCells: 1, pointerId: 8, pointerType: 'mouse' };
+moveDrag({ pointerId: 8, clientX: 120, clientY: 5 });
+const upperEnd = state.drag.end;
+runFrames(5);
+assert.ok(scroll.scrollTop < 20 * 42);
+assert.ok(state.drag.end < upperEnd, 'upward auto-scroll extends the selection');
+cancelDrag();
+state.drag = { day, start: 20, end: 20, selected: true, minCells: 1, pointerId: 9, pointerType: 'touch' };
+moveDrag({ pointerId: 9, clientX: 120, clientY: 295 });
+assert.equal(frames.size, 0, 'touch selection keeps the existing two-finger scrolling behavior');
+cancelDrag();
 assert.equal(isPastStart('2026-11-02', 20, 0), true);
 assert.equal(isPastStart('2026-11-03', 23, 11 * 60 + 31), true);
 assert.equal(isPastStart('2026-11-03', 24, 11 * 60 + 31), false);
